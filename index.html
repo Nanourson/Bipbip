@@ -259,7 +259,7 @@ function FormView({profile,profileIdx,profiles,setIdx,apiKey,go,updateProfile,ad
     const reader=new FileReader();
     reader.onload=async ev=>{
       const bytes=new Uint8Array(ev.target.result);
-      setPdfBytes(bytes);
+      setPdfBytes(Array.from(bytes));
       try{
         const PL=await loadPdfLib();
         const doc=await PL.PDFDocument.load(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),{ignoreEncryption:true});
@@ -346,7 +346,7 @@ Réponds UNIQUEMENT en JSON valide sans markdown :
     try{
       const PL=await loadPdfLib();
       const {PDFDocument,rgb,StandardFonts}=PL;
-      const buffer=pdfBytes.slice(0).buffer;
+      const buffer=new Uint8Array(pdfBytes).buffer;
       const pdfDoc=await PDFDocument.load(buffer,{ignoreEncryption:true,updateMetadata:false});
       const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
       const pages=pdfDoc.getPages();
@@ -518,7 +518,7 @@ Réponds UNIQUEMENT en JSON valide sans markdown :
                 <div style={{display:"flex",gap:12,marginTop:16,flexWrap:"wrap"}}>
                   <button style={s.btnS} onClick={()=>setStep("questions")} disabled={(analysisData?.questions||[]).length===0}>← Modifier les réponses</button>
                   <button style={s.btnP} onClick={generateAndDownload} disabled={busy} aria-busy={busy}>
-                    {busy?"Génération...":"👍 Bon travail ! Télécharger"}
+                    {busy?"Génération...":"Télécharger le PDF"}
                   </button>
                 </div>
                 {status&&<p role="status" style={s.statusBox}>{status}</p>}
