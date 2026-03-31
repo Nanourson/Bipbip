@@ -220,7 +220,6 @@ function FormView({activeProfile,activeIdx,apiKey,setView,updateProfileAtIdx,add
   const [filledData,setFilledData]   = useState(null);
   const [questions,setQuestions]     = useState([]);
   const [answers,setAnswers]         = useState({});
-  const [editingQ,setEditingQ]       = useState(null);
   const [remarks,setRemarks]         = useState("");
   const [step,setStep]               = useState("upload"); // upload|questions|preview|pdfview|done
   const [status,setStatus]           = useState("");
@@ -465,24 +464,14 @@ Règles :
                 {questions.map(q=>(
                   <fieldset key={q.id} style={s.fieldset}>
                     <legend style={s.legend}>{q.question}</legend>
-                    {editingQ===q.id||!answers[q.id]?(
-                      <>
-                        {q.type==="radio"&&q.options?.length?(
-                          q.options.map((opt,oi)=>(
-                            <label key={oi} style={s.radioLabel}>
-                              <input type="radio" name={q.id} value={opt} checked={answers[q.id]===opt} onChange={()=>setAnswers(a=>({...a,[q.id]:opt}))} style={s.radio}/>{opt}
-                            </label>
-                          ))
-                        ):(
-                          <input type="text" value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))} style={s.input} aria-required="true"/>
-                        )}
-                        {answers[q.id]&&<button style={{...s.btnSecondary,marginTop:8}} onClick={()=>setEditingQ(null)}>✓ Valider cette réponse</button>}
-                      </>
+                    {q.type==="radio"&&q.options?.length?(
+                      q.options.map((opt,oi)=>(
+                        <label key={oi} style={s.radioLabel}>
+                          <input type="radio" name={q.id} value={opt} checked={answers[q.id]===opt} onChange={()=>setAnswers(a=>({...a,[q.id]:opt}))} style={s.radio}/>{opt}
+                        </label>
+                      ))
                     ):(
-                      <div style={{display:"flex",alignItems:"center",gap:12,flexWrap:"wrap"}}>
-                        <span style={{fontSize:17}}><strong>{answers[q.id]}</strong></span>
-                        <button style={s.btnSecondary} onClick={()=>setEditingQ(q.id)}>Modifier</button>
-                      </div>
+                      <input type="text" value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))} style={s.input} aria-required="true"/>
                     )}
                   </fieldset>
                 ))}
@@ -522,7 +511,6 @@ Règles :
                         <li key={q.id} style={{...s.fieldItem,flexWrap:"wrap",gap:8}}>
                           <span style={s.fieldName}>{q.field} :</span>
                           <span style={{flex:1}}>{answers[q.id]}</span>
-                          <button style={s.btnSecondary} onClick={()=>{ setStep("questions"); setEditingQ(q.id); }}>Modifier</button>
                         </li>
                       ))}
                     </ul>
