@@ -112,10 +112,10 @@
         setTesting(true); setError("");
         announce("Vérification de votre clé en cours...");
         try {
-          const res = await fetch("https://api.anthropic.com/v1/messages", {
+          const res = await fetch("/api/chat", {
             method: "POST",
-            headers: { "Content-Type": "application/json", "x-api-key": trimmed, "anthropic-version": "2023-06-01" },
-            body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 10, messages: [{ role: "user", content: "ok" }] })
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ apiKey: trimmed, messages: [{ role: "user", content: "ok" }] })
           });
           if (res.ok) { announce("Clé validée ! Bienvenue dans Bipbip."); onSave(trimmed); }
           else {
@@ -314,10 +314,10 @@
       };
 
       const callClaude = async (prompt) => {
-        const res = await fetch("https://api.anthropic.com/v1/messages", {
+        const res = await fetch("/api/chat", {
           method: "POST",
-          headers: { "Content-Type":"application/json", "x-api-key": apiKey, "anthropic-version":"2023-06-01" },
-          body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1500, messages:[{ role:"user", content:prompt }] })
+          headers: { "Content-Type":"application/json" },
+          body: JSON.stringify({ apiKey, messages:[{ role:"user", content:prompt }] })
         });
         const data = await res.json();
         return data.content?.map(b => b.text||"").join("") || "";
