@@ -346,7 +346,7 @@ Réponds UNIQUEMENT en JSON valide sans markdown :
     try{
       const PL=await loadPdfLib();
       const {PDFDocument,rgb,StandardFonts}=PL;
-      const buffer=pdfBytes.buffer.slice(pdfBytes.byteOffset,pdfBytes.byteOffset+pdfBytes.byteLength);
+      const buffer=pdfBytes.slice(0).buffer;
       const pdfDoc=await PDFDocument.load(buffer,{ignoreEncryption:true,updateMetadata:false});
       const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
       const pages=pdfDoc.getPages();
