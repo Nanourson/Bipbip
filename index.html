@@ -1,116 +1,115 @@
-<!DOCTYPE html>
+                      <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bipbip – Secrétaire numérique pour malvoyants</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Bipbip – Secrétaire numérique</title>
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-  <style>* { box-sizing: border-box; } body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-serif; }</style>
+  <style>*{box-sizing:border-box}body{margin:0;padding:0;background:#fff;font-family:Arial,sans-serif}</style>
 </head>
 <body>
 <div id="root"></div>
 <script type="text/babel">
-const { useState, useCallback } = React;
+const {useState,useCallback} = React;
 
 const PROFILE_FIELDS = [
-  { key:"firstName",     label:"Prénom" },
-  { key:"lastName",      label:"Nom" },
-  { key:"birthDate",     label:"Date de naissance" },
-  { key:"birthPlace",    label:"Lieu de naissance" },
-  { key:"address",       label:"Adresse" },
-  { key:"postalCode",    label:"Code postal" },
-  { key:"city",          label:"Ville" },
-  { key:"email",         label:"Email" },
-  { key:"phone",         label:"Téléphone" },
-  { key:"secu",          label:"Numéro de sécurité sociale" },
-  { key:"nationality",   label:"Nationalité" },
-  { key:"maritalStatus", label:"Situation familiale" },
+  {key:"firstName",     label:"Prénom"},
+  {key:"lastName",      label:"Nom"},
+  {key:"birthDate",     label:"Date de naissance"},
+  {key:"birthPlace",    label:"Lieu de naissance"},
+  {key:"address",       label:"Adresse"},
+  {key:"postalCode",    label:"Code postal"},
+  {key:"city",          label:"Ville"},
+  {key:"email",         label:"Email"},
+  {key:"phone",         label:"Téléphone"},
+  {key:"secu",          label:"Numéro de sécurité sociale"},
+  {key:"nationality",   label:"Nationalité"},
+  {key:"maritalStatus", label:"Situation familiale"},
 ];
 
-function loadLS(k,d){ try{ const v=localStorage.getItem(k); return v?JSON.parse(v):d; }catch{ return d; } }
-function saveLS(k,v){ try{ localStorage.setItem(k,JSON.stringify(v)); }catch{} }
+function loadLS(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch{return d;}}
+function saveLS(k,v){try{localStorage.setItem(k,JSON.stringify(v));}catch{}}
 
-const initialState = {
-  apiKey:          loadLS("bipbip_apikey",""),
-  apiKeyValidated: !!loadLS("bipbip_apikey",""),
-  profiles:        loadLS("bipbip_profiles",[]),
-  activeIdx:       0,
-  history:         loadLS("bipbip_history",[]),
-  view:            loadLS("bipbip_apikey","") ? "home" : "apikey",
-  previewEntry:    null,
+const initState = {
+  apiKey:         loadLS("bb_apikey",""),
+  apiOk:          !!loadLS("bb_apikey",""),
+  profiles:       loadLS("bb_profiles",[]),
+  activeIdx:      0,
+  history:        loadLS("bb_history",[]),
+  view:           loadLS("bb_apikey","")?"home":"apikey",
+  previewEntry:   null,
 };
 
-function App(){
-  const [app,setApp]         = useState(initialState);
-  const [liveMsg,setLiveMsg] = useState("");
-  const announce = useCallback(msg=>{ setLiveMsg(""); setTimeout(()=>setLiveMsg(msg),50); },[]);
-  const setView  = v => setApp(a=>({...a,view:v}));
+export default function App(){
+  const [app,setApp]         = useState(initState);
+  const [live,setLive]       = useState("");
+  const say = useCallback(m=>{setLive("");setTimeout(()=>setLive(m),50);},[]);
+  const go  = v=>setApp(a=>({...a,view:v}));
 
-  const updateProfiles = (profiles,activeIdx) => {
-    saveLS("bipbip_profiles",profiles);
-    setApp(a=>({...a,profiles,activeIdx:activeIdx??a.activeIdx}));
-  };
-  const addHistory = entry => setApp(a=>{ const h=[entry,...a.history]; saveLS("bipbip_history",h); return {...a,history:h}; });
-  const updateProfileAtIdx = (idx,profile) => setApp(a=>{ const p=[...a.profiles]; p[idx]=profile; saveLS("bipbip_profiles",p); return {...a,profiles:p}; });
-  const saveApiKey = key => { saveLS("bipbip_apikey",key); setApp(a=>({...a,apiKey:key,apiKeyValidated:true,view:a.profiles.length===0?"profile":"home"})); };
-  const openPreview = entry => setApp(a=>({...a,view:"preview",previewEntry:entry}));
+  const saveProfiles = (profiles,idx)=>{saveLS("bb_profiles",profiles);setApp(a=>({...a,profiles,activeIdx:idx??a.activeIdx}));};
+  const saveApiKey   = k=>{saveLS("bb_apikey",k);setApp(a=>({...a,apiKey:k,apiOk:true,view:a.profiles.length===0?"profile":"home"}));};
+  const addHistory   = e=>setApp(a=>{const h=[e,...a.history];saveLS("bb_history",h);return{...a,history:h};});
+  const updateProfile= (idx,p)=>setApp(a=>{const ps=[...a.profiles];ps[idx]=p;saveLS("bb_profiles",ps);return{...a,profiles:ps};});
+  const openPreview  = e=>setApp(a=>({...a,view:"preview",previewEntry:e}));
+
   const {view,profiles,activeIdx,history,previewEntry,apiKey} = app;
   const activeProfile = profiles[activeIdx]||null;
 
-  if(view==="apikey")  return <ApiKeyView onSave={saveApiKey} liveMsg={liveMsg} announce={announce}/>;
-  if(view==="home")    return <HomeView setView={setView} profiles={profiles} activeIdx={activeIdx} setActiveIdx={i=>setApp(a=>({...a,activeIdx:i}))} liveMsg={liveMsg} onChangeKey={()=>setApp(a=>({...a,view:"apikey",apiKeyValidated:false}))}/>;
-  if(view==="profile") return <ProfileView profiles={profiles} activeIdx={activeIdx} updateProfiles={updateProfiles} setView={setView} liveMsg={liveMsg} announce={announce}/>;
-  if(view==="history") return <HistoryView history={history} setView={setView} openPreview={openPreview} liveMsg={liveMsg}/>;
-  if(view==="preview") return <PreviewView entry={previewEntry} setView={setView} liveMsg={liveMsg}/>;
-  return <FormView activeProfile={activeProfile} activeIdx={activeIdx} apiKey={apiKey} setView={setView} updateProfileAtIdx={updateProfileAtIdx} addHistory={addHistory} liveMsg={liveMsg} announce={announce}/>;
+  if(view==="apikey")  return <ApiKeyView onSave={saveApiKey} live={live} say={say}/>;
+  if(view==="home")    return <HomeView go={go} profiles={profiles} activeIdx={activeIdx} setIdx={i=>setApp(a=>({...a,activeIdx:i}))} live={live} changeKey={()=>setApp(a=>({...a,view:"apikey",apiOk:false}))}/>;
+  if(view==="profile") return <ProfileView profiles={profiles} activeIdx={activeIdx} saveProfiles={saveProfiles} go={go} live={live} say={say}/>;
+  if(view==="history") return <HistoryView history={history} go={go} openPreview={openPreview} live={live}/>;
+  if(view==="preview") return <PreviewView entry={previewEntry} go={go} live={live}/>;
+  return <FormView profile={activeProfile} profileIdx={activeIdx} apiKey={apiKey} go={go} updateProfile={updateProfile} addHistory={addHistory} live={live} say={say}/>;
 }
 
 // ─── API KEY ──────────────────────────────────────────────────────────────────
-function ApiKeyView({onSave,liveMsg,announce}){
-  const [key,setKey]         = useState("");
-  const [error,setError]     = useState("");
-  const [testing,setTesting] = useState(false);
+function ApiKeyView({onSave,live,say}){
+  const [key,setKey]=[useState(""),v=>{}];
+  const [k,setK]     = useState("");
+  const [err,setErr] = useState("");
+  const [busy,setBusy]= useState(false);
 
-  const validate = async () => {
-    const trimmed = key.trim();
-    if(!trimmed.startsWith("sk-ant-")){ setError("La clé doit commencer par sk-ant-... Vérifiez que vous avez bien tout copié."); announce("Erreur : clé invalide."); return; }
-    setTesting(true); setError(""); announce("Vérification en cours...");
+  const validate = async()=>{
+    const t=k.trim();
+    if(!t.startsWith("sk-ant-")){setErr("La clé doit commencer par sk-ant-...");say("Clé invalide.");return;}
+    setBusy(true);setErr("");say("Vérification...");
     try{
-      const res = await fetch("/api/chat",{ method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({apiKey:trimmed,messages:[{role:"user",content:"ok"}]}) });
-      if(res.ok){ announce("Clé validée ! Bienvenue !"); onSave(trimmed); }
-      else{ const e=await res.json().catch(()=>({})); setError(`Clé refusée : ${e?.error?.message||"vérifiez qu'elle est correcte et active."}`); announce("Erreur : clé refusée."); }
-    }catch{ setError("Impossible de vérifier la clé. Vérifiez votre connexion."); announce("Erreur de connexion."); }
-    setTesting(false);
+      const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apiKey:t,messages:[{role:"user",content:"ok"}]})});
+      if(r.ok){say("Clé validée !");onSave(t);}
+      else{const e=await r.json().catch(()=>({}));setErr(`Clé refusée : ${e?.error?.message||"vérifiez qu'elle est correcte."}`);say("Clé refusée.");}
+    }catch{setErr("Impossible de vérifier. Vérifiez votre connexion.");say("Erreur de connexion.");}
+    setBusy(false);
   };
 
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Bipbip" subtitle="Votre secrétaire numérique pour formulaires PDF"/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Bipbip" sub="Votre secrétaire numérique pour formulaires PDF"/>
       <main style={s.main}>
-        <section aria-labelledby="ak-title" style={s.section}>
-          <h2 id="ak-title" style={s.h2}>Bienvenue !</h2>
+        <section aria-labelledby="ak-h" style={s.sec}>
+          <h2 id="ak-h" style={s.h2}>Bienvenue !</h2>
           <p style={s.hint}>Pour fonctionner, cette application a besoin de votre clé API Anthropic personnelle. Elle reste uniquement sur votre appareil.</p>
           <div style={s.infoBox} role="note">
-            <p style={{margin:"0 0 8px",fontWeight:"bold",fontSize:18}}>📋 Vous n'avez pas encore de clé API ?</p>
+            <p style={{margin:"0 0 8px",fontWeight:"bold",fontSize:18}}>📋 Pas encore de clé API ?</p>
             <ol style={{margin:0,paddingLeft:22,lineHeight:2.2,fontSize:17}}>
-              <li>Allez sur <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={s.link}>console.anthropic.com</a></li>
+              <li>Allez sur <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={s.lnk}>console.anthropic.com</a></li>
               <li>Créez un compte gratuit — bouton <strong>"Sign up"</strong></li>
               <li>Dans le menu à gauche, cliquez sur <strong>"API Keys"</strong></li>
               <li>Cliquez sur <strong>"Create Key"</strong>, nommez-la, copiez-la</li>
             </ol>
-            <p style={{margin:"14px 0 0",color:"#444",fontSize:16}}>💡 <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer" style={s.link}>Voir les tarifs →</a></p>
+            <p style={{margin:"12px 0 0",fontSize:16}}>💡 <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer" style={s.lnk}>Voir les tarifs →</a></p>
           </div>
-          <div style={s.formRow}>
-            <label htmlFor="api-key-input" style={s.label}>Collez votre clé API ici :</label>
-            <input id="api-key-input" type="password" value={key} onChange={e=>setKey(e.target.value)} style={s.input} placeholder="sk-ant-api03-..." aria-describedby="ak-hint ak-error" autoComplete="off"/>
-            <p id="ak-hint" style={s.hint}>Stockée uniquement sur votre appareil, jamais partagée.</p>
-            {error && <p id="ak-error" role="alert" style={s.errorMsg}>{error}</p>}
+          <div style={s.row}>
+            <label htmlFor="ak-in" style={s.lbl}>Collez votre clé API ici :</label>
+            <input id="ak-in" type="password" value={k} onChange={e=>setK(e.target.value)} style={s.inp} placeholder="sk-ant-api03-..." autoComplete="off" aria-describedby="ak-hint ak-err"/>
+            <p id="ak-hint" style={s.hint}>Stockée uniquement sur votre appareil.</p>
+            {err&&<p id="ak-err" role="alert" style={s.errMsg}>{err}</p>}
           </div>
-          <button style={key.trim()?s.btnPrimary:s.btnDisabled} onClick={validate} disabled={!key.trim()||testing} aria-busy={testing}>
-            {testing?"Vérification...":"Valider ma clé et commencer"}
+          <button style={k.trim()?s.btnP:s.btnD} onClick={validate} disabled={!k.trim()||busy} aria-busy={busy}>
+            {busy?"Vérification...":"Valider ma clé et commencer"}
           </button>
         </section>
       </main>
@@ -119,30 +118,28 @@ function ApiKeyView({onSave,liveMsg,announce}){
 }
 
 // ─── HOME ─────────────────────────────────────────────────────────────────────
-function HomeView({setView,profiles,activeIdx,setActiveIdx,liveMsg,onChangeKey}){
+function HomeView({go,profiles,activeIdx,setIdx,live,changeKey}){
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Bipbip" subtitle="Votre secrétaire numérique pour formulaires PDF"/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Bipbip" sub="Votre secrétaire numérique pour formulaires PDF"/>
       <main style={s.main}>
         <nav aria-label="Actions principales" style={s.homeNav}>
-          {[{icon:"📄",label:"Remplir un formulaire",view:"form"},{icon:"👤",label:"Mon profil",view:"profile"},{icon:"📁",label:"Historique",view:"history"}].map(btn=>(
-            <button key={btn.view} style={s.homeBtn} onClick={()=>setView(btn.view)}>
-              <span aria-hidden="true" style={s.homeBtnIcon}>{btn.icon}</span>{btn.label}
-            </button>
+          {[{icon:"📄",lbl:"Remplir un formulaire",v:"form"},{icon:"👤",lbl:"Mon profil",v:"profile"},{icon:"📁",lbl:"Historique",v:"history"}].map(b=>(
+            <button key={b.v} style={s.homeBtn} onClick={()=>go(b.v)}><span aria-hidden="true" style={s.homeBtnI}>{b.icon}</span>{b.lbl}</button>
           ))}
         </nav>
         {profiles.length>1&&(
-          <section aria-labelledby="sw-lbl" style={s.section}>
-            <h2 id="sw-lbl" style={s.h2}>Profil actif</h2>
-            <label htmlFor="profile-sel" style={s.label}>Choisir un profil :</label>
-            <select id="profile-sel" value={activeIdx} onChange={e=>setActiveIdx(Number(e.target.value))} style={s.input}>
+          <section aria-labelledby="sw-h" style={s.sec}>
+            <h2 id="sw-h" style={s.h2}>Profil actif</h2>
+            <label htmlFor="p-sel" style={s.lbl}>Choisir un profil :</label>
+            <select id="p-sel" value={activeIdx} onChange={e=>setIdx(Number(e.target.value))} style={s.inp}>
               {profiles.map((p,i)=><option key={p.id} value={i}>{p.firstName} {p.lastName}</option>)}
             </select>
           </section>
         )}
-        <section style={{...s.section,borderBottom:"none"}}>
-          <button style={s.btnSecondary} onClick={onChangeKey}>🔑 Changer ma clé API</button>
+        <section style={{...s.sec,borderBottom:"none"}}>
+          <button style={s.btnS} onClick={changeKey}>🔑 Changer ma clé API</button>
         </section>
       </main>
     </div>
@@ -150,60 +147,60 @@ function HomeView({setView,profiles,activeIdx,setActiveIdx,liveMsg,onChangeKey})
 }
 
 // ─── PROFILE ─────────────────────────────────────────────────────────────────
-function ProfileView({profiles,activeIdx,updateProfiles,setView,liveMsg,announce}){
-  const [editIdx,setEditIdx] = useState(activeIdx);
-  const [form,setForm]       = useState(()=>profiles[activeIdx]?{...profiles[activeIdx]}:{id:Date.now()});
-  const isNew = editIdx>=profiles.length;
-  const set   = (k,v)=>setForm(f=>({...f,[k]:v}));
+function ProfileView({profiles,activeIdx,saveProfiles,go,live,say}){
+  const [idx,setIdx] = useState(activeIdx);
+  const [form,setF]  = useState(()=>profiles[activeIdx]?{...profiles[activeIdx]}:{id:Date.now()});
+  const isNew = idx>=profiles.length;
+  const set   = (k,v)=>setF(f=>({...f,[k]:v}));
 
-  const save = ()=>{
-    const updated=[...profiles];
-    if(isNew) updated.push(form); else updated[editIdx]=form;
-    updateProfiles(updated,isNew?updated.length-1:editIdx);
-    if(isNew) setEditIdx(updated.length-1);
-    announce("Profil sauvegardé.");
+  const save=()=>{
+    const u=[...profiles];
+    if(isNew) u.push(form); else u[idx]=form;
+    saveProfiles(u,isNew?u.length-1:idx);
+    if(isNew) setIdx(u.length-1);
+    say("Profil sauvegardé.");
   };
 
-  const handleSig = e=>{
-    const file=e.target.files[0]; if(!file) return;
-    const reader=new FileReader();
-    reader.onload=ev=>{ set("signature",ev.target.result); set("sigName",file.name); announce("Signature chargée."); };
-    reader.readAsDataURL(file);
+  const handleSig=e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=ev=>{set("signature",ev.target.result);set("sigName",f.name);say("Signature chargée.");};
+    r.readAsDataURL(f);
   };
 
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Mon profil" back={{label:"← Accueil",action:()=>setView("home")}}/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Mon profil" back={{lbl:"← Accueil",fn:()=>go("home")}}/>
       <main style={s.main}>
         {profiles.length>0&&(
-          <section aria-labelledby="sel-lbl" style={s.section}>
-            <h2 id="sel-lbl" style={s.h2}>Profils enregistrés</h2>
+          <section aria-labelledby="sel-h" style={s.sec}>
+            <h2 id="sel-h" style={s.h2}>Profils enregistrés</h2>
             <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
               {profiles.map((p,i)=>(
-                <button key={p.id} style={editIdx===i&&!isNew?s.btnPrimary:s.btnSecondary} onClick={()=>{ setEditIdx(i); setForm({...profiles[i]}); }}>
+                <button key={p.id} style={idx===i&&!isNew?s.btnP:s.btnS} onClick={()=>{setIdx(i);setF({...profiles[i]});}}>
                   {p.firstName||"Sans nom"} {p.lastName}
                 </button>
               ))}
-              <button style={s.btnSecondary} onClick={()=>{ setEditIdx(profiles.length); setForm({id:Date.now()}); }}>+ Nouveau profil</button>
+              <button style={s.btnS} onClick={()=>{setIdx(profiles.length);setF({id:Date.now()});}}>+ Nouveau profil</button>
             </div>
           </section>
         )}
-        <section aria-labelledby="ed-lbl" style={s.section}>
-          <h2 id="ed-lbl" style={s.h2}>{isNew?"Nouveau profil":"Modifier le profil"}</h2>
+        <section aria-labelledby="ed-h" style={s.sec}>
+          <h2 id="ed-h" style={s.h2}>{isNew?"Nouveau profil":"Modifier le profil"}</h2>
           {PROFILE_FIELDS.map(f=>(
-            <div key={f.key} style={s.formRow}>
-              <label htmlFor={`pf-${f.key}`} style={s.label}>{f.label}</label>
-              <input id={`pf-${f.key}`} type="text" value={form[f.key]||""} onChange={e=>set(f.key,e.target.value)} style={s.input}/>
+            <div key={f.key} style={s.row}>
+              <label htmlFor={`pf-${f.key}`} style={s.lbl}>{f.label}</label>
+              <input id={`pf-${f.key}`} type="text" value={form[f.key]||""} onChange={e=>set(f.key,e.target.value)} style={s.inp}/>
             </div>
           ))}
-          <div style={s.formRow}>
-            <label htmlFor="sig-up" style={s.label}>Signature (image PNG ou JPG)</label>
-            <label htmlFor="sig-up" style={s.fileLabel}>Choisir ma signature<input id="sig-up" type="file" accept="image/*" onChange={handleSig} style={s.fileInput}/></label>
-            {form.sigName&&<p style={s.success}>✓ {form.sigName}</p>}
+          <div style={s.row}>
+            <label htmlFor="sig-up" style={s.lbl}>Signature (PNG ou JPG)</label>
+            <label htmlFor="sig-up" style={s.fileBtn}>Choisir ma signature<input id="sig-up" type="file" accept="image/*" onChange={handleSig} style={s.fileHide}/></label>
+            {form.sigName&&<p style={s.ok}>✓ {form.sigName}</p>}
             {form.signature&&<img src={form.signature} alt="Aperçu signature" style={{maxHeight:60,marginTop:8,border:"1px solid #ccc",display:"block"}}/>}
           </div>
-          <button style={s.btnPrimary} onClick={save}>Enregistrer le profil</button>
+          <button style={s.btnP} onClick={save}>Enregistrer le profil</button>
         </section>
       </main>
     </div>
@@ -211,367 +208,357 @@ function ProfileView({profiles,activeIdx,updateProfiles,setView,liveMsg,announce
 }
 
 // ─── FORM ─────────────────────────────────────────────────────────────────────
-function FormView({activeProfile,activeIdx,apiKey,setView,updateProfileAtIdx,addHistory,liveMsg,announce}){
-  const [pdfFile,setPdfFile]         = useState(null);
-  const [pdfBytes,setPdfBytes]       = useState(null);
-  const [pdfText,setPdfText]         = useState("");
-  const [pdfType,setPdfType]         = useState("");
-  const [processing,setProcessing]   = useState(false);
-  const [filledData,setFilledData]   = useState(null);
-  const [questions,setQuestions]     = useState([]);
-  const [answers,setAnswers]         = useState({});
-  const [remarks,setRemarks]         = useState("");
-  const [step,setStep]               = useState("upload"); // upload|questions|preview|pdfview|done
-  const [status,setStatus]           = useState("");
-  const [pdfWarning,setPdfWarning]   = useState("");
-  const [previewUrl,setPreviewUrl]   = useState(null);
+function FormView({profile,profileIdx,apiKey,go,updateProfile,addHistory,live,say}){
+  // step: upload → analyzing → questions → synthesis → pdfview → done
+  const [step,setStep]           = useState("upload");
+  const [pdfFile,setPdfFile]     = useState(null);
+  const [pdfBytes,setPdfBytes]   = useState(null);
+  const [pdfText,setPdfText]     = useState("");
+  const [pdfType,setPdfType]     = useState("");
+  const [busy,setBusy]           = useState(false);
+  const [status,setStatus]       = useState("");
+  const [analysisData,setAData]  = useState(null); // {filled, questions, ...}
+  const [qAnswers,setQA]         = useState({});    // answers to missing questions
+  const [synthesis,setSynth]     = useState([]);    // editable list of all fields
+  const [layoutPrompt,setLP]     = useState("");
+  const [previewUrl,setPrevUrl]  = useState(null);
 
   const loadPdfLib = async()=>{
-    if(!window.PDFLib){
-      await new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
-    }
+    if(!window.PDFLib) await new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js";sc.onload=res;sc.onerror=rej;document.head.appendChild(sc);});
     return window.PDFLib;
   };
-
   const loadPdfJs = async()=>{
     if(!window.pdfjsLib){
-      await new Promise((res,rej)=>{ const sc=document.createElement("script"); sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"; sc.onload=res; sc.onerror=rej; document.head.appendChild(sc); });
+      await new Promise((res,rej)=>{const sc=document.createElement("script");sc.src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";sc.onload=res;sc.onerror=rej;document.head.appendChild(sc);});
       window.pdfjsLib.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
     }
     return window.pdfjsLib;
   };
 
-  const handlePdfUpload = async e=>{
-    const file=e.target.files[0]; if(!file) return;
-    setPdfFile(file); setFilledData(null); setQuestions([]); setAnswers({}); setRemarks(""); setStep("upload"); setPdfWarning(""); setStatus("Lecture du PDF..."); announce("Lecture du PDF en cours.");
+  // STEP 1 — Upload & detect PDF type
+  const handleUpload = async e=>{
+    const file=e.target.files[0];if(!file)return;
+    setPdfFile(file);setPdfBytes(null);setPdfText("");setPdfType("");setAData(null);setQA({});setSynth([]);setLP("");setPrevUrl(null);setStep("upload");setStatus("Lecture...");say("Lecture du PDF.");
     const reader=new FileReader();
     reader.onload=async ev=>{
       const bytes=new Uint8Array(ev.target.result);
       setPdfBytes(bytes);
-      // Detect PDF type
       try{
-        const PDFLib=await loadPdfLib();
-        const pdfDoc=await PDFLib.PDFDocument.load(bytes,{ignoreEncryption:true});
-        const form=pdfDoc.getForm();
-        const fields=form.getFields();
-        if(fields.length>0){ setPdfType("fields"); setStatus(`PDF avec ${fields.length} champ(s) interactif(s) détecté. Prêt !`); announce("PDF remplissable détecté."); }
+        const PL=await loadPdfLib();
+        const doc=await PL.PDFDocument.load(bytes,{ignoreEncryption:true});
+        const fields=doc.getForm().getFields();
+        if(fields.length>0){setPdfType("fields");setStatus(`Formulaire interactif — ${fields.length} champ(s) détecté(s).`);say("Formulaire interactif détecté.");}
         else{
-          // Try to extract text
-          const pdfjs=await loadPdfJs();
-          const doc=await pdfjs.getDocument({data:bytes}).promise;
-          let text="";
-          for(let i=1;i<=doc.numPages;i++){ const pg=await doc.getPage(i); const c=await pg.getTextContent(); text+=c.items.map(it=>it.str).join(" ")+"\n"; }
-          text=text.trim();
-          if(text.length>50){ setPdfType("text"); setPdfText(text); setStatus("PDF texte détecté. Prêt !"); announce("PDF texte détecté."); }
-          else{ setPdfType("image"); setPdfText("PDF image/scan — analyse visuelle."); setStatus("PDF image/scan détecté. Prêt !"); announce("PDF image détecté."); }
+          const pj=await loadPdfJs();
+          const pd=await pj.getDocument({data:bytes}).promise;
+          let txt="";
+          for(let i=1;i<=pd.numPages;i++){const pg=await pd.getPage(i);const c=await pg.getTextContent();txt+=c.items.map(it=>it.str).join(" ")+"\n";}
+          txt=txt.trim();
+          if(txt.length>50){setPdfType("text");setPdfText(txt);setStatus("PDF texte — prêt.");say("PDF texte détecté.");}
+          else{setPdfType("image");setStatus("PDF image/scan — prêt.");say("PDF image détecté.");}
         }
-      }catch{ setPdfType("unknown"); setStatus("PDF chargé. Prêt !"); announce("PDF chargé."); }
+      }catch{setPdfType("unknown");setStatus("PDF chargé.");}
     };
     reader.readAsArrayBuffer(file);
   };
 
-  const callClaude = async prompt=>{
-    const res=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apiKey,messages:[{role:"user",content:prompt}]})});
-    const data=await res.json();
-    return data.content?.map(b=>b.text||"").join("")||"";
+  const callClaude = async(messages)=>{
+    const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({apiKey,messages})});
+    const d=await r.json();
+    return d.content?.map(b=>b.text||"").join("")||"";
   };
 
-  const analyze = async(correctionNote="")=>{
-    if(!pdfFile||!activeProfile) return;
-    setProcessing(true); setStatus("Au boulot !..."); announce("Analyse en cours, veuillez patienter.");
-    const profileStr=PROFILE_FIELDS.map(f=>`${f.label}: ${activeProfile[f.key]||"(non renseigné)"}`).join("\n");
-    const answersStr=Object.keys(answers).length>0 ? "\nRÉPONSES DÉJÀ FOURNIES :\n"+questions.map(q=>`${q.field}: ${answers[q.id]||"non renseigné"}`).join("\n") : "";
-    const prompt=`Tu es une secrétaire aidant une personne non-voyante à remplir un formulaire administratif.
+  // STEP 2 — Analyze: match profile to PDF fields, find missing info
+  const analyze = async()=>{
+    if(!pdfFile||!profile)return;
+    setBusy(true);setStatus("Au boulot !...");say("Analyse en cours.");
+    const profileStr=PROFILE_FIELDS.map(f=>`${f.label}: ${profile[f.key]||"(non renseigné)"}`).join("\n");
+    const prompt=`Tu es une secrétaire aidant une personne non-voyante à remplir un formulaire.
 
-PROFIL :
+PROFIL DE L'UTILISATEUR :
 ${profileStr}
-${answersStr}
 
-FORMULAIRE PDF (texte extrait) :
-${pdfText||"PDF image — localise les zones de saisie visuellement."}
-${correctionNote?`\nCORRECTIONS ET REMARQUES : ${correctionNote}`:""}
+CONTENU DU FORMULAIRE :
+${pdfText||"PDF image — analyse les zones de saisie visuellement."}
 
-Détecte la langue du formulaire et réponds dans cette langue pour les questions.
-Mention "Lu et approuvé" selon la langue : français="Lu et approuvé", anglais="Read and approved", espagnol="Leído y aprobado", roumain="Citit și aprobat".
+RÈGLES TRÈS IMPORTANTES :
+- Ne calcule JAMAIS une valeur dérivée (ex: ne calcule pas l'âge à partir de la date de naissance).
+- Si une information n'est pas explicitement dans le profil, mets-la dans "questions", jamais dans "filled".
+- Pour "filled", utilise UNIQUEMENT les valeurs textuelles exactes du profil.
+- Détecte la langue du formulaire et utilise-la pour les questions.
+- x, y sont les coordonnées approximatives en points PDF (origine bas-gauche), null si inconnu.
+- "lu_approuve" selon la langue : fr="Lu et approuvé", en="Read and approved", es="Leído y aprobado", ro="Citit și aprobat"
 
 Réponds UNIQUEMENT en JSON valide sans markdown :
 {
   "language": "fr",
-  "summary": "résumé court",
-  "filled": [{"field":"nom du champ","value":"valeur","source":"profil","x":null,"y":null,"page":1}],
-  "questions": [{"id":"q1","field":"nom du champ","question":"question","type":"text","options":[]}],
-  "signatureField": {"page":1,"x":400,"y":100},
-  "luApprouveField": {"page":1,"x":400,"y":130},
+  "summary": "résumé court du formulaire",
+  "filled": [{"field":"nom exact du champ","value":"valeur du profil","page":1,"x":null,"y":null}],
+  "questions": [{"id":"q1","field":"nom du champ","question":"question claire","type":"text","options":[]}],
   "needsSignature": true,
-  "needsLuApprouve": true
+  "signaturePos": {"page":1,"x":400,"y":150},
+  "needsLuApprouve": true,
+  "luApprouvePos": {"page":1,"x":400,"y":120},
+  "luApprouveText": "Lu et approuvé"
 }
-Règles :
-- "radio" pour choix multiples avec options, "text" pour champs libres avec options:[]
-- Ne devine pas les cases à cocher
-- x,y sont les coordonnées approximatives en points PDF (origine bas-gauche). Mettre null si inconnu.
-- options doit toujours être présent, [] si vide`;
+"type" vaut "radio" pour choix multiples (avec options), "text" pour champ libre (options:[]).`;
 
     try{
-      const raw=await callClaude(prompt);
-      const clean=raw.replace(/```json|```/g,"").trim();
-      const parsed=JSON.parse(clean);
-      setFilledData(parsed);
-      // Merge new questions with existing answers
-      const newQ=parsed.questions||[];
-      setQuestions(newQ);
-      const msg=`Terminé ! ${parsed.filled?.length||0} champs remplis. ${newQ.length} question(s).`;
-      setStatus(msg); announce(msg);
-      setStep(newQ.length>0?"questions":"preview");
-    }catch{ setStatus("Erreur d'analyse. Réessayez."); announce("Erreur lors de l'analyse."); }
-    setProcessing(false);
+      const raw=await callClaude([{role:"user",content:prompt}]);
+      const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
+      setAData(parsed);
+      if((parsed.questions||[]).length>0){setStep("questions");say(`${parsed.questions.length} question(s) à répondre.`);}
+      else{buildSynthesis(parsed,{});setStep("synthesis");say("Synthèse prête.");}
+    }catch{setStatus("Erreur d'analyse. Réessayez.");say("Erreur.");}
+    setBusy(false);
   };
 
-  const allAnswered = questions.every(q=>(answers[q.id]||"").trim()!=="");
+  // STEP 3 → 4: build synthesis from filled + answered questions
+  const buildSynthesis=(data,answers)=>{
+    const rows=[
+      ...(data.filled||[]).map(f=>({field:f.field,value:f.value,page:f.page,x:f.x,y:f.y,source:"profil"})),
+      ...(data.questions||[]).map(q=>({field:q.field,value:answers[q.id]||"",page:1,x:null,y:null,source:"utilisateur"})),
+    ];
+    setSynth(rows);
+    setStep("synthesis");
+    say("Synthèse prête. Vérifiez les informations.");
+  };
 
-  const goToPreview = ()=>{ setStep("preview"); announce("Prévisualisation du document. Vérifiez les informations."); };
+  const allQAnswered = analysisData?(analysisData.questions||[]).every(q=>(qAnswers[q.id]||"").trim()!==""):true;
 
-  const buildPdfBytes = async()=>{
-    if(!pdfBytes||!filledData) return null;
-    const PDFLib=await loadPdfLib();
-    const {PDFDocument,rgb,StandardFonts}=PDFLib;
+  // STEP 5 — Generate PDF in memory and show preview
+  const generatePdfBytes = async(layoutNote="")=>{
+    const PL=await loadPdfLib();
+    const {PDFDocument,rgb,StandardFonts}=PL;
     const pdfDoc=await PDFDocument.load(pdfBytes,{ignoreEncryption:true});
     const font=await pdfDoc.embedFont(StandardFonts.Helvetica);
     const pages=pdfDoc.getPages();
-    const allFields=[
-      ...(filledData.filled||[]),
-      ...questions.map(q=>({field:q.field,value:answers[q.id]||"",source:"utilisateur",x:null,y:null,page:1}))
-    ];
+
+    // If interactive fields
     if(pdfType==="fields"){
       try{
         const form=pdfDoc.getForm();
-        for(const f of allFields){
-          try{ const field=form.getTextField(f.field); if(field) field.setText(f.value); }
-          catch{ const allF=form.getFields(); const match=allF.find(ff=>ff.getName().toLowerCase().includes(f.field.toLowerCase().substring(0,8))); if(match&&match.constructor.name==="PDFTextField") match.setText(f.value); }
+        for(const row of synthesis){
+          if(!row.value)continue;
+          try{form.getTextField(row.field).setText(row.value);}
+          catch{const all=form.getFields();const m=all.find(f=>f.getName().toLowerCase().includes(row.field.toLowerCase().substring(0,6)));if(m)try{m.setText(row.value);}catch{}}
         }
       }catch{}
     } else {
-      for(const f of allFields){
-        if(!f.value||f.x===null) continue;
-        const page=pages[(f.page||1)-1]||pages[0];
-        const {height}=page.getSize();
-        try{ page.drawText(String(f.value).substring(0,60),{x:f.x,y:height-(f.y||100),size:10,font,color:rgb(0,0,0)}); }catch{}
-      }
-      const luMap={fr:"Lu et approuvé",en:"Read and approved",es:"Leído y aprobado",ro:"Citit și aprobat"};
-      if(filledData.needsLuApprouve){
-        const lf=filledData.luApprouveField;
-        const page=pages[(lf?.page||1)-1]||pages[0];
-        const {height}=page.getSize();
-        page.drawText(luMap[filledData.language||"fr"]||"Lu et approuvé",{x:lf?.x||50,y:lf?.y??(height-700),size:11,font,color:rgb(0,0,0)});
+      // Text overlay
+      for(const row of synthesis){
+        if(!row.value||row.x===null)continue;
+        const pg=pages[(row.page||1)-1]||pages[0];
+        const {height}=pg.getSize();
+        try{pg.drawText(String(row.value).substring(0,80),{x:row.x,y:height-(row.y||100),size:10,font,color:rgb(0,0,0)});}catch{}
       }
     }
-    if(filledData.needsSignature&&activeProfile?.signature){
+
+    // Lu et approuvé
+    if(analysisData?.needsLuApprouve){
+      const lp=analysisData.luApprouvePos;
+      const pg=pages[(lp?.page||1)-1]||pages[0];
+      const {height}=pg.getSize();
+      try{pg.drawText(analysisData.luApprouveText||"Lu et approuvé",{x:lp?.x||50,y:lp?.y??(height-720),size:11,font,color:rgb(0,0,0)});}catch{}
+    }
+
+    // Signature
+    if(analysisData?.needsSignature&&profile?.signature){
       try{
-        const sigBytes=Uint8Array.from(atob(activeProfile.signature.split(",")[1]),c=>c.charCodeAt(0));
-        const mime=(activeProfile.signature.match(/data:(image\/\w+);/)||[])[1]||"image/png";
-        const sigImg=mime.includes("jp")?await pdfDoc.embedJpg(sigBytes):await pdfDoc.embedPng(sigBytes);
-        const sf=filledData.signatureField;
-        const page=pages[(sf?.page||1)-1]||pages[0];
-        const {height}=page.getSize();
-        const dims=sigImg.scale(0.25);
-        page.drawImage(sigImg,{x:sf?.x||400,y:sf?.y??(height-700),width:dims.width,height:dims.height});
+        const sb=Uint8Array.from(atob(profile.signature.split(",")[1]),c=>c.charCodeAt(0));
+        const mime=(profile.signature.match(/data:(image\/\w+);/)||[])[1]||"image/png";
+        const si=mime.includes("jp")?await pdfDoc.embedJpg(sb):await pdfDoc.embedPng(sb);
+        const sp=analysisData.signaturePos;
+        const pg=pages[(sp?.page||1)-1]||pages[0];
+        const {height}=pg.getSize();
+        const d=si.scale(0.25);
+        pg.drawImage(si,{x:sp?.x||400,y:sp?.y??(height-720),width:d.width,height:d.height});
       }catch{}
     }
+
+    // Apply layout corrections from AI if any
+    if(layoutNote.trim()){
+      // Layout note is informational for now — future: second AI pass for repositioning
+    }
+
     return await pdfDoc.save();
   };
 
-  const showPreviewPdf = async()=>{
-    setProcessing(true); setStatus("Génération de la prévisualisation..."); announce("Prévisualisation en cours.");
+  const showPreview = async(layoutNote="")=>{
+    setBusy(true);setStatus("Génération de la prévisualisation...");say("Prévisualisation en cours.");
     try{
-      const finalBytes=await buildPdfBytes();
-      if(!finalBytes){ setStatus("Erreur de génération."); setProcessing(false); return; }
-      if(previewUrl) URL.revokeObjectURL(previewUrl);
-      const blob=new Blob([finalBytes],{type:"application/pdf"});
-      const url=URL.createObjectURL(blob);
-      setPreviewUrl(url);
-      setStep("pdfview");
-      announce("Prévisualisation du PDF prête. Vous pouvez le consulter.");
-    }catch(err){ setStatus("Erreur lors de la prévisualisation."); announce("Erreur de prévisualisation."); }
-    setProcessing(false);
+      const bytes=await generatePdfBytes(layoutNote);
+      if(previewUrl)URL.revokeObjectURL(previewUrl);
+      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+      setPrevUrl(url);setStep("pdfview");say("Prévisualisation prête.");
+    }catch{setStatus("Erreur de prévisualisation.");say("Erreur.");}
+    setBusy(false);
   };
 
-  const generateFinalPdf = async()=>{
-    if(!pdfBytes||!filledData) return;
-    setProcessing(true); setStatus("Génération du document final..."); announce("Génération en cours.");
+  const applyLayoutCorrection = async()=>{
+    if(!layoutPrompt.trim())return;
+    setBusy(true);setStatus("Application des corrections de mise en page...");say("Correction en cours.");
+    // Ask Claude to adjust positions based on layout prompt
+    const prompt=`Tu as généré ce plan de remplissage pour un formulaire PDF :
+${JSON.stringify({filled:synthesis,signaturePos:analysisData?.signaturePos,luApprouvePos:analysisData?.luApprouvePos},null,2)}
+
+L'utilisateur demande cet ajustement de mise en page : "${layoutPrompt}"
+
+Réponds UNIQUEMENT en JSON valide sans markdown avec les positions mises à jour :
+{
+  "filled": [...même structure avec x,y mis à jour si nécessaire],
+  "signaturePos": {"page":1,"x":...,"y":...},
+  "luApprouvePos": {"page":1,"x":...,"y":...}
+}`;
     try{
-      const finalBytes=await buildPdfBytes();
-      if(!finalBytes){ setStatus("Erreur de génération."); setProcessing(false); return; }
+      const raw=await callClaude([{role:"user",content:prompt}]);
+      const parsed=JSON.parse(raw.replace(/```json|```/g,"").trim());
+      if(parsed.filled) setSynth(parsed.filled);
+      if(parsed.signaturePos) setAData(d=>({...d,signaturePos:parsed.signaturePos}));
+      if(parsed.luApprouvePos) setAData(d=>({...d,luApprouvePos:parsed.luApprouvePos}));
+      setLP("");
+      await showPreview("");
+    }catch{setStatus("Erreur de correction.");say("Erreur.");}
+    setBusy(false);
+  };
+
+  const download = async()=>{
+    setBusy(true);say("Téléchargement...");
+    try{
+      const bytes=await generatePdfBytes();
       const today=new Date().toISOString().split("T")[0];
-      const baseName=(pdfFile.name||"formulaire").replace(/\.pdf$/i,"");
-      const userName=`${activeProfile.lastName||""}${activeProfile.firstName?"_"+activeProfile.firstName:""}`.replace(/\s+/g,"_");
-      const finalName=`${baseName}_${userName}_${today}.pdf`;
-      const blob=new Blob([finalBytes],{type:"application/pdf"});
-      const url=URL.createObjectURL(blob);
-      const a=document.createElement("a"); a.href=url; a.download=finalName; a.click();
+      const base=(pdfFile.name||"formulaire").replace(/\.pdf$/i,"");
+      const name=`${base}_${(profile.lastName||"").replace(/\s/g,"_")}_${(profile.firstName||"").replace(/\s/g,"_")}_${today}.pdf`;
+      const url=URL.createObjectURL(new Blob([bytes],{type:"application/pdf"}));
+      const a=document.createElement("a");a.href=url;a.download=name;a.click();
       URL.revokeObjectURL(url);
-
-      // Save to history
-      const entry={
-        id:Date.now(), date:new Date().toLocaleDateString("fr-FR"),
-        fileName:finalName, summary:filledData.summary||"",
-        fields:[...(filledData.filled||[]),...questions.map(q=>({field:q.field,value:answers[q.id]||"",source:"utilisateur"}))],
-        needsSignature:filledData.needsSignature, needsLuApprouve:filledData.needsLuApprouve,
-      };
-      addHistory(entry);
-
-      // Update profile with new answers
-      const updated={...activeProfile};
-      questions.forEach(q=>{ const m=PROFILE_FIELDS.find(f=>f.label.toLowerCase()===q.field.toLowerCase()); if(m&&answers[q.id]) updated[m.key]=answers[q.id]; });
-      updateProfileAtIdx(activeIdx,updated);
-
-      setStatus("✅ Document téléchargé !"); announce("Document final téléchargé avec succès."); setStep("done");
-    }catch(err){ setStatus("Erreur lors de la génération. Réessayez."); announce("Erreur de génération."); console.error(err); }
-    setProcessing(false);
+      // Save to history & update profile
+      const updated={...profile};
+      (analysisData?.questions||[]).forEach(q=>{const m=PROFILE_FIELDS.find(f=>f.label.toLowerCase()===q.field.toLowerCase());if(m&&qAnswers[q.id])updated[m.key]=qAnswers[q.id];});
+      updateProfile(profileIdx,updated);
+      addHistory({id:Date.now(),date:new Date().toLocaleDateString("fr-FR"),fileName:name,summary:analysisData?.summary||"",fields:synthesis});
+      setStep("done");say("Document téléchargé !");
+    }catch{setStatus("Erreur de téléchargement.");say("Erreur.");}
+    setBusy(false);
   };
+
+  const reset=()=>{setPdfFile(null);setPdfBytes(null);setPdfText("");setPdfType("");setAData(null);setQA({});setSynth([]);setLP("");setPrevUrl(null);setStep("upload");setStatus("");};
 
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Bipbip" back={{label:"← Accueil",action:()=>setView("home")}} navExtra={[{label:"Mon profil",action:()=>setView("profile")},{label:"Historique",action:()=>setView("history")}]}/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Bipbip" back={{lbl:"← Accueil",fn:()=>go("home")}} extra={[{lbl:"Mon profil",fn:()=>go("profile")},{lbl:"Historique",fn:()=>go("history")}]}/>
       <main style={s.main}>
-        {!activeProfile?(
-          <div role="alert" style={s.alertWarn}><p>Aucun profil créé. <button style={s.linkBtn} onClick={()=>setView("profile")}>Créer mon profil</button></p></div>
+        {!profile?(
+          <div role="alert" style={s.warn}><p>Aucun profil. <button style={s.lnkBtn} onClick={()=>go("profile")}>Créer mon profil</button></p></div>
         ):(
           <>
-            {/* STEP 1 — Upload */}
-            <section aria-labelledby="up-lbl" style={s.section}>
-              <h2 id="up-lbl" style={s.h2}>1. Charger un formulaire PDF</h2>
-              <p style={s.hint}>Profil actif : <strong>{activeProfile.firstName} {activeProfile.lastName}</strong></p>
-              <label htmlFor="pdf-in" style={s.fileLabel}>Choisir un fichier PDF<input id="pdf-in" type="file" accept=".pdf" onChange={handlePdfUpload} style={s.fileInput}/></label>
-              {pdfFile&&<p style={s.success} role="status">✓ {pdfFile.name} — {pdfType==="fields"?"Formulaire interactif":pdfType==="text"?"PDF texte":pdfType==="image"?"PDF image/scan":"PDF chargé"}</p>}
-              {pdfWarning&&<p role="alert" style={s.alertWarn}>{pdfWarning}</p>}
+            {/* ── ÉTAPE 1 : Upload ── */}
+            <section aria-labelledby="e1-h" style={s.sec}>
+              <h2 id="e1-h" style={s.h2}>1. Charger un formulaire PDF</h2>
+              <p style={s.hint}>Profil actif : <strong>{profile.firstName} {profile.lastName}</strong></p>
+              <label htmlFor="pdf-in" style={s.fileBtn}>Choisir un fichier PDF<input id="pdf-in" type="file" accept=".pdf" onChange={handleUpload} style={s.fileHide}/></label>
+              {pdfFile&&<p style={s.ok} role="status">✓ {pdfFile.name} — {pdfType==="fields"?"Formulaire interactif":pdfType==="text"?"PDF texte":pdfType==="image"?"PDF image/scan":"PDF chargé"}</p>}
             </section>
 
             {pdfFile&&step==="upload"&&(
-              <section aria-labelledby="an-lbl" style={s.section}>
-                <h2 id="an-lbl" style={s.h2}>2. Remplir le document</h2>
-                <button style={s.btnPrimary} onClick={()=>analyze()} disabled={processing} aria-busy={processing}>
-                  {processing?"Au boulot !...":"Au boulot !"}
-                </button>
-                {status&&<p role="status" style={s.statusMsg}>{status}</p>}
+              <section aria-labelledby="e2-h" style={s.sec}>
+                <h2 id="e2-h" style={s.h2}>2. Remplir le document</h2>
+                <button style={s.btnP} onClick={analyze} disabled={busy} aria-busy={busy}>{busy?"Au boulot !...":"Au boulot !"}</button>
+                {status&&<p role="status" style={s.statusBox}>{status}</p>}
               </section>
             )}
 
-            {/* STEP 2 — Questions */}
-            {step==="questions"&&questions.length>0&&(
-              <section aria-labelledby="q-lbl" style={s.section}>
-                <h2 id="q-lbl" style={s.h2}>2. Questions complémentaires</h2>
-                <p style={s.hint}>Répondez à chaque question. Vous pourrez modifier vos réponses avant validation.</p>
-                {questions.map(q=>(
-                  <fieldset key={q.id} style={s.fieldset}>
-                    <legend style={s.legend}>{q.question}</legend>
+            {/* ── ÉTAPE 3 : Questions manquantes ── */}
+            {step==="questions"&&analysisData&&(
+              <section aria-labelledby="e3-h" style={s.sec}>
+                <h2 id="e3-h" style={s.h2}>3. Informations manquantes</h2>
+                <p style={s.hint}>Ces informations ne figurent pas dans votre profil. Veuillez les renseigner.</p>
+                {(analysisData.questions||[]).map(q=>(
+                  <fieldset key={q.id} style={s.fset}>
+                    <legend style={s.leg}>{q.question}</legend>
                     {q.type==="radio"&&q.options?.length?(
-                      q.options.map((opt,oi)=>(
-                        <label key={oi} style={s.radioLabel}>
-                          <input type="radio" name={q.id} value={opt} checked={answers[q.id]===opt} onChange={()=>setAnswers(a=>({...a,[q.id]:opt}))} style={s.radio}/>{opt}
+                      q.options.map((opt,i)=>(
+                        <label key={i} style={s.radLbl}>
+                          <input type="radio" name={q.id} value={opt} checked={qAnswers[q.id]===opt} onChange={()=>setQA(a=>({...a,[q.id]:opt}))} style={s.rad}/>{opt}
                         </label>
                       ))
                     ):(
-                      <input type="text" value={answers[q.id]||""} onChange={e=>setAnswers(a=>({...a,[q.id]:e.target.value}))} style={s.input} aria-required="true"/>
+                      <input type="text" value={qAnswers[q.id]||""} onChange={e=>setQA(a=>({...a,[q.id]:e.target.value}))} style={s.inp} aria-required="true"/>
                     )}
                   </fieldset>
                 ))}
-                {allAnswered&&(
-                  <button style={s.btnPrimary} onClick={goToPreview}>Voir la prévisualisation →</button>
-                )}
-                {status&&<p role="status" style={s.statusMsg}>{status}</p>}
+                <button style={allQAnswered?s.btnP:s.btnD} onClick={()=>buildSynthesis(analysisData,qAnswers)} disabled={!allQAnswered}>
+                  Suivant →
+                </button>
+                {status&&<p role="status" style={s.statusBox}>{status}</p>}
               </section>
             )}
 
-            {/* STEP 3 — Preview */}
-            {step==="preview"&&filledData&&(
-              <section aria-labelledby="pv-lbl" style={s.section}>
-                <h2 id="pv-lbl" style={s.h2}>3. Vérification avant téléchargement</h2>
-                <p style={s.hint}>{filledData.summary}</p>
-                <p style={s.badge} role="status">
-                  ✓ {filledData.filled?.length||0} champs &nbsp;|&nbsp;
-                  {questions.length>0?`${questions.length} réponse(s) &nbsp;|&nbsp;`:""}
-                  {filledData.needsSignature?"✎ Signature":"Pas de signature"} &nbsp;|&nbsp;
-                  {filledData.needsLuApprouve?"📋 Lu et approuvé":""}
-                </p>
-
-                {/* Filled fields */}
-                <h3 style={{fontSize:18,color:"#003366"}}>Champs remplis automatiquement</h3>
-                <ul style={s.fieldList} aria-label="Champs remplis automatiquement">
-                  {(filledData.filled||[]).map((f,i)=>(
-                    <li key={i} style={s.fieldItem}><span style={s.fieldName}>{f.field} :</span><span>{f.value}</span></li>
-                  ))}
-                </ul>
-
-                {/* Answers */}
-                {questions.length>0&&(
-                  <>
-                    <h3 style={{fontSize:18,color:"#003366",marginTop:20}}>Vos réponses</h3>
-                    <ul style={s.fieldList} aria-label="Vos réponses">
-                      {questions.map(q=>(
-                        <li key={q.id} style={{...s.fieldItem,flexWrap:"wrap",gap:8}}>
-                          <span style={s.fieldName}>{q.field} :</span>
-                          <span style={{flex:1}}>{answers[q.id]}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </>
-                )}
-
-                {/* Remarks */}
-                <div style={{...s.formRow,marginTop:24}}>
-                  <label htmlFor="remarks-in" style={s.label}>Remarques globales (optionnel) :</label>
-                  <textarea id="remarks-in" value={remarks} onChange={e=>setRemarks(e.target.value)} rows={3} style={s.textarea} placeholder="Ex : Merci de mettre le texte en majuscules dans le champ nom, ou ajuster la position de la signature..."/>
-                  <p style={s.hint}>Ces remarques seront transmises pour correction avant téléchargement.</p>
+            {/* ── ÉTAPE 4 : Synthèse éditable ── */}
+            {step==="synthesis"&&(
+              <section aria-labelledby="e4-h" style={s.sec}>
+                <h2 id="e4-h" style={s.h2}>4. Vérification des informations</h2>
+                <p style={s.hint}>Vérifiez et corrigez si nécessaire. Cliquez sur "Suivant" pour valider tout d'un coup.</p>
+                <table style={s.tbl} aria-label="Informations à insérer dans le formulaire">
+                  <caption style={s.srOnly}>Toutes les informations prêtes à être insérées</caption>
+                  <thead><tr><th style={s.th} scope="col">Champ</th><th style={s.th} scope="col">Valeur</th><th style={s.th} scope="col">Source</th></tr></thead>
+                  <tbody>
+                    {synthesis.map((row,i)=>(
+                      <tr key={i} style={i%2===0?s.trE:{}}>
+                        <td style={s.td}>{row.field}</td>
+                        <td style={s.td}>
+                          <input
+                            type="text"
+                            value={row.value}
+                            onChange={e=>{const ns=[...synthesis];ns[i]={...ns[i],value:e.target.value};setSynth(ns);}}
+                            style={{...s.inp,marginBottom:0,border:"1px solid #aaa",padding:"6px 8px",fontSize:16}}
+                            aria-label={`Valeur pour ${row.field}`}
+                          />
+                        </td>
+                        <td style={s.td}>{row.source}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div style={{display:"flex",gap:12,marginTop:16,flexWrap:"wrap"}}>
+                  <button style={s.btnS} onClick={()=>setStep("questions")} disabled={(analysisData?.questions||[]).length===0}>← Modifier les réponses</button>
+                  <button style={s.btnP} onClick={()=>showPreview()} disabled={busy} aria-busy={busy}>{busy?"Génération...":"Suivant →"}</button>
                 </div>
-
-                {remarks.trim()&&(
-                  <button style={{...s.btnSecondary,marginBottom:16}} onClick={()=>{ analyze(remarks); setRemarks(""); }} disabled={processing}>
-                    {processing?"Correction en cours...":"Envoyer les corrections à Bipbip"}
-                  </button>
-                )}
-
-                <div style={{display:"flex",gap:12,flexWrap:"wrap",marginTop:16}}>
-                  <button style={s.btnSecondary} onClick={()=>setStep("questions")} disabled={questions.length===0}>← Modifier les réponses</button>
-                  <button style={s.btnPrimary} onClick={showPreviewPdf} disabled={processing} aria-busy={processing}>
-                    {processing?"Génération...":"👁 Voir le résultat"}
-                  </button>
-                </div>
-                {status&&<p role="status" style={s.statusMsg}>{status}</p>}
+                {status&&<p role="status" style={s.statusBox}>{status}</p>}
               </section>
             )}
 
-            {/* STEP 4 — PDF Preview fullscreen */}
+            {/* ── ÉTAPE 5 : Prévisualisation PDF ── */}
             {step==="pdfview"&&previewUrl&&(
-              <section aria-labelledby="pdfv-lbl" style={{...s.section,padding:0,border:"none"}}>
+              <section aria-labelledby="e5-h" style={{...s.sec,padding:0,border:"none"}}>
                 <div style={{display:"flex",alignItems:"center",gap:12,padding:"16px",background:"#f0f4f8",borderBottom:"2px solid #003366",flexWrap:"wrap"}}>
-                  <h2 id="pdfv-lbl" style={{...s.h2,margin:0}}>👁 Prévisualisation du document</h2>
+                  <h2 id="e5-h" style={{...s.h2,margin:0}}>5. Prévisualisation du document</h2>
                   <div style={{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"}}>
-                    <button style={s.btnSecondary} onClick={()=>setStep("preview")}>← Revenir aux corrections</button>
-                    <button style={s.btnPrimary} onClick={generateFinalPdf} disabled={processing} aria-busy={processing}>
-                      {processing?"Téléchargement...":"👍 Bon travail ! Télécharger"}
-                    </button>
+                    <button style={s.btnS} onClick={()=>setStep("synthesis")}>← Revenir à la synthèse</button>
+                    <button style={s.btnP} onClick={download} disabled={busy} aria-busy={busy}>{busy?"Téléchargement...":"👍 Bon travail ! Télécharger"}</button>
                   </div>
                 </div>
-                <p style={{...s.hint,padding:"8px 16px",margin:0}}>Vérifiez le document ci-dessous. Si vous voyez une erreur, cliquez sur "Revenir aux corrections".</p>
-                <iframe
-                  src={previewUrl}
-                  title="Prévisualisation du formulaire rempli"
-                  aria-label="Document PDF rempli — utilisez votre lecteur d'écran pour naviguer dans ce document"
-                  style={{width:"100%",height:"80vh",border:"none",display:"block"}}
-                />
-                {status&&<p role="status" style={{...s.statusMsg,margin:"8px 16px"}}>{status}</p>}
+                <iframe src={previewUrl} title="Prévisualisation du formulaire rempli" aria-label="Document PDF rempli" style={{width:"100%",height:"80vh",border:"none",display:"block"}}/>
+                <div style={{padding:"16px",borderTop:"2px solid #eee"}}>
+                  <label htmlFor="layout-in" style={s.lbl}>Ajustements de mise en page (optionnel) :</label>
+                  <textarea id="layout-in" value={layoutPrompt} onChange={e=>setLP(e.target.value)} rows={3} style={s.ta} placeholder="Ex : Déplacer la signature plus bas, mettre 'Lu et approuvé' à droite..."/>
+                  <p style={s.hint}>Ce champ sert uniquement à ajuster la mise en page, pas les informations.</p>
+                  {layoutPrompt.trim()&&(
+                    <button style={s.btnS} onClick={applyLayoutCorrection} disabled={busy}>{busy?"Correction...":"Appliquer les corrections de mise en page"}</button>
+                  )}
+                </div>
+                {status&&<p role="status" style={{...s.statusBox,margin:"8px 16px"}}>{status}</p>}
               </section>
             )}
 
-            {/* STEP 4 — Done */}
+            {/* ── DONE ── */}
             {step==="done"&&(
-              <section aria-labelledby="done-lbl" style={s.section}>
-                <h2 id="done-lbl" style={s.h2}>✅ Document téléchargé !</h2>
+              <section aria-labelledby="done-h" style={s.sec}>
+                <h2 id="done-h" style={s.h2}>✅ Document téléchargé !</h2>
                 <p style={s.hint}>Votre document a été téléchargé sur votre appareil.</p>
-                <button style={s.btnPrimary} onClick={()=>{ setPdfFile(null); setPdfBytes(null); setPdfText(""); setFilledData(null); setQuestions([]); setAnswers({}); setRemarks(""); setStep("upload"); setStatus(""); }}>
-                  Remplir un nouveau formulaire
-                </button>
-                <button style={{...s.btnSecondary,marginLeft:12}} onClick={()=>setView("history")}>Voir l'historique</button>
+                <button style={s.btnP} onClick={reset}>Remplir un nouveau formulaire</button>
+                <button style={{...s.btnS,marginLeft:12}} onClick={()=>go("history")}>Voir l'historique</button>
               </section>
             )}
           </>
@@ -582,20 +569,20 @@ Règles :
 }
 
 // ─── HISTORY ─────────────────────────────────────────────────────────────────
-function HistoryView({history,setView,openPreview,liveMsg}){
+function HistoryView({history,go,openPreview,live}){
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Historique" back={{label:"← Accueil",action:()=>setView("home")}}/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Historique" back={{lbl:"← Accueil",fn:()=>go("home")}}/>
       <main style={s.main}>
         {history.length===0?<p style={s.hint}>Aucun formulaire complété pour l'instant.</p>:(
-          <ul style={s.fieldList} aria-label="Formulaires complétés">
+          <ul style={s.ul} aria-label="Formulaires complétés">
             {history.map(h=>(
-              <li key={h.id} style={{...s.fieldItem,flexDirection:"column",alignItems:"flex-start",gap:6}}>
+              <li key={h.id} style={{...s.li,flexDirection:"column",alignItems:"flex-start",gap:6}}>
                 <strong>{h.fileName}</strong>
                 <span style={s.hint}>{h.date} — {h.summary}</span>
-                <span style={s.badge}>{h.fields?.length||0} champs remplis</span>
-                <button style={s.btnSecondary} onClick={()=>openPreview(h)}>Voir le détail</button>
+                <span style={s.badge}>{h.fields?.length||0} champs</span>
+                <button style={s.btnS} onClick={()=>openPreview(h)}>Voir le détail</button>
               </li>
             ))}
           </ul>
@@ -606,21 +593,20 @@ function HistoryView({history,setView,openPreview,liveMsg}){
 }
 
 // ─── PREVIEW ─────────────────────────────────────────────────────────────────
-function PreviewView({entry,setView,liveMsg}){
-  if(!entry) return(<div style={s.container}><Header title="Prévisualisation" back={{label:"← Accueil",action:()=>setView("home")}}/><main style={s.main}><p>Aucune donnée.</p></main></div>);
+function PreviewView({entry,go,live}){
+  if(!entry)return(<div style={s.page}><Hdr title="Détail" back={{lbl:"← Accueil",fn:()=>go("home")}}/><main style={s.main}><p>Aucune donnée.</p></main></div>);
   return(
-    <div style={s.container}>
-      <LiveRegion msg={liveMsg}/>
-      <Header title="Prévisualisation" back={{label:"← Accueil",action:()=>setView("home")}} navExtra={[{label:"Historique",action:()=>setView("history")}]}/>
+    <div style={s.page}>
+      <LR msg={live}/>
+      <Hdr title="Détail du formulaire" back={{lbl:"← Accueil",fn:()=>go("home")}} extra={[{lbl:"Historique",fn:()=>go("history")}]}/>
       <main style={s.main}>
-        <section aria-labelledby="pv-lbl" style={s.section}>
-          <h2 id="pv-lbl" style={s.h2}>{entry.fileName}</h2>
+        <section aria-labelledby="pv-h" style={s.sec}>
+          <h2 id="pv-h" style={s.h2}>{entry.fileName}</h2>
           <p style={s.hint}>{entry.date} — {entry.summary}</p>
-          <p style={s.badge} role="status">{entry.fields?.length||0} champs &nbsp;|&nbsp; {entry.needsSignature?"Signature placée":"Pas de signature"} &nbsp;|&nbsp; {entry.needsLuApprouve?"Lu et approuvé":""}</p>
-          <table style={s.table} aria-label="Contenu du formulaire rempli">
+          <table style={s.tbl} aria-label="Champs remplis">
             <caption style={s.srOnly}>Tous les champs remplis</caption>
             <thead><tr><th style={s.th} scope="col">Champ</th><th style={s.th} scope="col">Valeur</th><th style={s.th} scope="col">Source</th></tr></thead>
-            <tbody>{(entry.fields||[]).map((f,i)=>(<tr key={i} style={i%2===0?s.trEven:{}}><td style={s.td}>{f.field}</td><td style={s.td}>{f.value}</td><td style={s.td}>{f.source}</td></tr>))}</tbody>
+            <tbody>{(entry.fields||[]).map((f,i)=>(<tr key={i} style={i%2===0?s.trE:{}}><td style={s.td}>{f.field}</td><td style={s.td}>{f.value}</td><td style={s.td}>{f.source}</td></tr>))}</tbody>
           </table>
         </section>
       </main>
@@ -629,65 +615,64 @@ function PreviewView({entry,setView,liveMsg}){
 }
 
 // ─── SHARED ───────────────────────────────────────────────────────────────────
-function LiveRegion({msg}){ return <div aria-live="polite" aria-atomic="true" style={s.srOnly}>{msg}</div>; }
-function Header({title,subtitle,back,navExtra}){
+function LR({msg}){return <div aria-live="polite" aria-atomic="true" style={s.srOnly}>{msg}</div>;}
+function Hdr({title,sub,back,extra}){
   return(
-    <header style={s.header}>
-      <div><h1 style={s.h1}>{title}</h1>{subtitle&&<p style={s.subtitle}>{subtitle}</p>}</div>
+    <header style={s.hdr}>
+      <div><h1 style={s.h1}>{title}</h1>{sub&&<p style={s.sub}>{sub}</p>}</div>
       <nav style={s.nav} aria-label="Navigation">
-        {back&&<button style={s.navBtn} onClick={back.action}>{back.label}</button>}
-        {navExtra?.map(n=><button key={n.label} style={s.navBtn} onClick={n.action}>{n.label}</button>)}
+        {back&&<button style={s.navBtn} onClick={back.fn}>{back.lbl}</button>}
+        {extra?.map(n=><button key={n.lbl} style={s.navBtn} onClick={n.fn}>{n.lbl}</button>)}
       </nav>
     </header>
   );
 }
 
 const s={
-  container:{fontFamily:"Arial, sans-serif",fontSize:"18px",lineHeight:1.6,color:"#1a1a1a",background:"#fff",minHeight:"100vh"},
-  header:{background:"#003366",color:"#fff",padding:"16px 24px",display:"flex",flexWrap:"wrap",alignItems:"center",gap:16},
+  page:{fontFamily:"Arial,sans-serif",fontSize:"18px",lineHeight:1.6,color:"#1a1a1a",background:"#fff",minHeight:"100vh"},
+  hdr:{background:"#003366",color:"#fff",padding:"16px 24px",display:"flex",flexWrap:"wrap",alignItems:"center",gap:16},
   h1:{margin:0,fontSize:"24px",color:"#fff"},
-  subtitle:{margin:"4px 0 0",fontSize:"15px",color:"#cce0ff"},
+  sub:{margin:"4px 0 0",fontSize:"15px",color:"#cce0ff"},
   nav:{marginLeft:"auto",display:"flex",gap:8,flexWrap:"wrap"},
   navBtn:{background:"transparent",border:"2px solid #fff",color:"#fff",padding:"6px 14px",borderRadius:4,cursor:"pointer",fontSize:"16px"},
   main:{padding:"24px",maxWidth:800,margin:"0 auto"},
-  section:{marginBottom:32,borderBottom:"1px solid #ddd",paddingBottom:24},
+  sec:{marginBottom:32,borderBottom:"1px solid #ddd",paddingBottom:24},
   h2:{fontSize:"20px",color:"#003366",marginBottom:12},
   hint:{color:"#555",fontSize:"16px",margin:"4px 0 12px"},
-  label:{display:"block",fontWeight:"bold",marginBottom:6},
-  input:{width:"100%",padding:"10px",fontSize:"16px",border:"2px solid #666",borderRadius:4,boxSizing:"border-box"},
-  textarea:{width:"100%",padding:"10px",fontSize:"16px",border:"2px solid #666",borderRadius:4,boxSizing:"border-box",fontFamily:"inherit"},
-  fileLabel:{display:"inline-block",padding:"10px 18px",background:"#f0f4f8",border:"2px solid #666",borderRadius:4,cursor:"pointer",fontSize:"16px"},
-  fileInput:{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"},
-  btnPrimary:{background:"#003366",color:"#fff",border:"none",padding:"12px 24px",fontSize:"18px",borderRadius:4,cursor:"pointer",marginTop:8},
-  btnSecondary:{background:"#fff",color:"#003366",border:"2px solid #003366",padding:"10px 20px",fontSize:"16px",borderRadius:4,cursor:"pointer",marginTop:8},
-  btnDisabled:{background:"#aaa",color:"#fff",border:"none",padding:"12px 24px",fontSize:"18px",borderRadius:4,cursor:"not-allowed",marginTop:8},
-  linkBtn:{background:"none",border:"none",color:"#003366",textDecoration:"underline",cursor:"pointer",fontSize:"inherit"},
-  success:{color:"#006600",fontWeight:"bold",margin:"8px 0"},
-  errorMsg:{color:"#cc0000",fontWeight:"bold",margin:"8px 0",padding:"10px",background:"#fff0f0",border:"2px solid #cc0000",borderRadius:4},
-  alertWarn:{background:"#fff3cd",border:"2px solid #856404",padding:"12px",borderRadius:4,color:"#856404",margin:"8px 0"},
-  statusMsg:{background:"#e8f4fd",border:"1px solid #bee5eb",padding:"10px",borderRadius:4,marginTop:8},
-  badge:{display:"inline-block",background:"#e8f0fe",color:"#003366",padding:"4px 12px",borderRadius:20,fontSize:"15px",marginBottom:12},
-  fieldList:{listStyle:"none",padding:0,margin:0},
-  fieldItem:{display:"flex",gap:8,padding:"10px 0",borderBottom:"1px solid #eee",alignItems:"center"},
-  fieldName:{fontWeight:"bold",minWidth:180},
-  fieldset:{border:"2px solid #666",borderRadius:4,padding:"12px 16px",marginBottom:16},
-  legend:{fontWeight:"bold",fontSize:"17px",padding:"0 8px"},
-  radioLabel:{display:"block",padding:"6px 0",cursor:"pointer"},
-  radio:{marginRight:10,width:20,height:20},
-  formRow:{marginBottom:16},
+  lbl:{display:"block",fontWeight:"bold",marginBottom:6},
+  inp:{width:"100%",padding:"10px",fontSize:"16px",border:"2px solid #666",borderRadius:4,boxSizing:"border-box"},
+  ta:{width:"100%",padding:"10px",fontSize:"16px",border:"2px solid #666",borderRadius:4,boxSizing:"border-box",fontFamily:"inherit"},
+  fileBtn:{display:"inline-block",padding:"10px 18px",background:"#f0f4f8",border:"2px solid #666",borderRadius:4,cursor:"pointer",fontSize:"16px"},
+  fileHide:{position:"absolute",width:1,height:1,overflow:"hidden",clip:"rect(0,0,0,0)"},
+  btnP:{background:"#003366",color:"#fff",border:"none",padding:"12px 24px",fontSize:"18px",borderRadius:4,cursor:"pointer",marginTop:8},
+  btnS:{background:"#fff",color:"#003366",border:"2px solid #003366",padding:"10px 20px",fontSize:"16px",borderRadius:4,cursor:"pointer",marginTop:8},
+  btnD:{background:"#aaa",color:"#fff",border:"none",padding:"12px 24px",fontSize:"18px",borderRadius:4,cursor:"not-allowed",marginTop:8},
+  lnkBtn:{background:"none",border:"none",color:"#003366",textDecoration:"underline",cursor:"pointer",fontSize:"inherit"},
+  ok:{color:"#006600",fontWeight:"bold",margin:"8px 0"},
+  errMsg:{color:"#cc0000",fontWeight:"bold",margin:"8px 0",padding:"10px",background:"#fff0f0",border:"2px solid #cc0000",borderRadius:4},
+  warn:{background:"#fff3cd",border:"2px solid #856404",padding:"12px",borderRadius:4,color:"#856404",margin:"8px 0"},
+  statusBox:{background:"#e8f4fd",border:"1px solid #bee5eb",padding:"10px",borderRadius:4,marginTop:8},
+  badge:{display:"inline-block",background:"#e8f0fe",color:"#003366",padding:"4px 12px",borderRadius:20,fontSize:"15px"},
+  ul:{listStyle:"none",padding:0,margin:0},
+  li:{display:"flex",gap:8,padding:"10px 0",borderBottom:"1px solid #eee",alignItems:"center"},
+  fset:{border:"2px solid #666",borderRadius:4,padding:"12px 16px",marginBottom:16},
+  leg:{fontWeight:"bold",fontSize:"17px",padding:"0 8px"},
+  radLbl:{display:"block",padding:"6px 0",cursor:"pointer"},
+  rad:{marginRight:10,width:20,height:20},
+  row:{marginBottom:16},
   homeNav:{display:"flex",flexDirection:"column",gap:16,maxWidth:400,margin:"32px auto"},
   homeBtn:{display:"flex",alignItems:"center",gap:16,padding:"20px 24px",fontSize:"20px",background:"#003366",color:"#fff",border:"none",borderRadius:8,cursor:"pointer",width:"100%"},
-  homeBtnIcon:{fontSize:"28px"},
+  homeBtnI:{fontSize:"28px"},
   infoBox:{background:"#f0f7ff",border:"2px solid #003366",borderRadius:8,padding:"20px",marginBottom:24},
-  link:{color:"#003366",fontWeight:"bold"},
-  table:{width:"100%",borderCollapse:"collapse",marginTop:16},
+  lnk:{color:"#003366",fontWeight:"bold"},
+  tbl:{width:"100%",borderCollapse:"collapse",marginTop:16},
   th:{background:"#003366",color:"#fff",padding:"10px 12px",textAlign:"left",fontSize:"16px"},
   td:{padding:"10px 12px",borderBottom:"1px solid #ddd",fontSize:"16px"},
-  trEven:{background:"#f7f9fc"},
+  trE:{background:"#f7f9fc"},
   srOnly:{position:"absolute",width:1,height:1,padding:0,margin:-1,overflow:"hidden",clip:"rect(0,0,0,0)",whiteSpace:"nowrap",border:0},
 };
 
 ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
 </script>
 </body>
-</html>
+</html>  
