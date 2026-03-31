@@ -1,1 +1,704 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bipbip – Secrétaire numérique pour malvoyants</title>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: #fff; font-family: Arial, sans-serif; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState, useCallback } = React;
 
+    const STORAGE_KEY_PROFILES = "bipbip_profiles";
+    const STORAGE_KEY_HISTORY  = "bipbip_history";
+    const STORAGE_KEY_APIKEY   = "bipbip_apikey";
+
+    const PROFILE_FIELDS = [
+      { key: "firstName",     label: "Prénom" },
+      { key: "lastName",      label: "Nom" },
+      { key: "birthDate",     label: "Date de naissance" },
+      { key: "birthPlace",    label: "Lieu de naissance" },
+      { key: "address",       label: "Adresse" },
+      { key: "postalCode",    label: "Code postal" },
+      { key: "city",          label: "Ville" },
+      { key: "email",         label: "Email" },
+      { key: "phone",         label: "Téléphone" },
+      { key: "secu",          label: "Numéro de sécurité sociale" },
+      { key: "nationality",   label: "Nationalité" },
+      { key: "maritalStatus", label: "Situation familiale" },
+    ];
+
+    function loadLS(key, def) {
+      try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : def; } catch { return def; }
+    }
+    function saveLS(key, val) { try { localStorage.setItem(key, JSON.stringify(val)); } catch {} }
+
+    const initialState = {
+      apiKey:           loadLS(STORAGE_KEY_APIKEY, ""),
+      apiKeyValidated:  !!loadLS(STORAGE_KEY_APIKEY, ""),
+      profiles:         loadLS(STORAGE_KEY_PROFILES, []),
+      activeIdx:        0,
+      history:          loadLS(STORAGE_KEY_HISTORY, []),
+      view:             loadLS(STORAGE_KEY_APIKEY, "") ? "home" : "apikey",
+      previewEntry:     null,
+    };
+
+    function App() {
+      const [app, setApp]       = useState(initialState);
+      const [liveMsg, setLiveMsg] = useState("");
+      const announce = useCallback((msg) => { setLiveMsg(""); setTimeout(() => setLiveMsg(msg), 50); }, []);
+
+      const setView = (v) => setApp(a => ({ ...a, view: v }));
+
+      const updateProfiles = (profiles, activeIdx) => {
+        saveLS(STORAGE_KEY_PROFILES, profiles);
+        setApp(a => ({ ...a, profiles, activeIdx: activeIdx ?? a.activeIdx }));
+      };
+
+      const addHistory = (entry) => {
+        setApp(a => {
+          const h = [entry, ...a.history];
+          saveLS(STORAGE_KEY_HISTORY, h);
+          return { ...a, history: h };
+        });
+      };
+
+      const updateProfileAtIdx = (idx, profile) => {
+        setApp(a => {
+          const p = [...a.profiles];
+          p[idx] = profile;
+          saveLS(STORAGE_KEY_PROFILES, p);
+          return { ...a, profiles: p };
+        });
+      };
+
+      const saveApiKey = (key) => {
+        saveLS(STORAGE_KEY_APIKEY, key);
+        setApp(a => ({ ...a, apiKey: key, apiKeyValidated: true, view: a.profiles.length === 0 ? "profile" : "home" }));
+      };
+
+      const openPreview = (entry) => setApp(a => ({ ...a, view: "preview", previewEntry: entry }));
+
+      const { view, profiles, activeIdx, history, previewEntry, apiKey } = app;
+      const activeProfile = profiles[activeIdx] || null;
+
+      if (view === "apikey")  return <ApiKeyView onSave={saveApiKey} liveMsg={liveMsg} announce={announce} />;
+      if (view === "home")    return <HomeView setView={setView} profiles={profiles} activeIdx={activeIdx} setActiveIdx={i => setApp(a => ({ ...a, activeIdx: i }))} liveMsg={liveMsg} onChangeKey={() => setApp(a => ({ ...a, view: "apikey", apiKeyValidated: false }))} />;
+      if (view === "profile") return <ProfileView profiles={profiles} activeIdx={activeIdx} updateProfiles={updateProfiles} setView={setView} liveMsg={liveMsg} announce={announce} />;
+      if (view === "history") return <HistoryView history={history} setView={setView} openPreview={openPreview} liveMsg={liveMsg} />;
+      if (view === "preview") return <PreviewView entry={previewEntry} setView={setView} liveMsg={liveMsg} />;
+      return <FormView activeProfile={activeProfile} activeIdx={activeIdx} apiKey={apiKey} setView={setView} updateProfileAtIdx={updateProfileAtIdx} addHistory={addHistory} liveMsg={liveMsg} announce={announce} />;
+    }
+
+    function ApiKeyView({ onSave, liveMsg, announce }) {
+      const [key, setKey]       = useState("");
+      const [error, setError]   = useState("");
+      const [testing, setTesting] = useState(false);
+
+      const validate = async () => {
+        const trimmed = key.trim();
+        if (!trimmed.startsWith("sk-ant-")) {
+          setError("La clé doit commencer par sk-ant-... Vérifiez que vous avez bien tout copié.");
+          announce("Erreur : clé invalide."); return;
+        }
+        setTesting(true); setError("");
+        announce("Vérification de votre clé en cours...");
+        try {
+          const res = await fetch("https://api.anthropic.com/v1/messages", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "x-api-key": trimmed, "anthropic-version": "2023-06-01" },
+            body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 10, messages: [{ role: "user", content: "ok" }] })
+          });
+          if (res.ok) { announce("Clé validée ! Bienvenue dans Bipbip."); onSave(trimmed); }
+          else {
+            const err = await res.json().catch(() => ({}));
+            setError(`Clé refusée : ${err?.error?.message || "vérifiez qu'elle est correcte et active."}`);
+            announce("Erreur : clé refusée.");
+          }
+        } catch { setError("Impossible de vérifier la clé. Vérifiez votre connexion internet."); announce("Erreur de connexion."); }
+        setTesting(false);
+      };
+
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Bipbip" subtitle="Votre secrétaire numérique pour formulaires PDF" />
+          <main style={s.main}>
+            <section aria-labelledby="ak-title" style={s.section}>
+              <h2 id="ak-title" style={s.h2}>Bienvenue dans Bipbip !</h2>
+              <p style={s.hint}>Pour fonctionner, Bipbip a besoin de votre clé API Anthropic personnelle. Cette clé reste uniquement sur votre appareil et n'est jamais partagée.</p>
+              <div style={s.infoBox} role="note" aria-label="Instructions pour obtenir une clé API">
+                <p style={{ margin:"0 0 8px", fontWeight:"bold", fontSize:18 }}>📋 Vous n'avez pas encore de clé API ?</p>
+                <p style={{ margin:"0 0 10px" }}>Suivez ces 4 étapes simples :</p>
+                <ol style={{ margin:0, paddingLeft:22, lineHeight:2.2, fontSize:17 }}>
+                  <li>Allez sur <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={s.link}>console.anthropic.com</a></li>
+                  <li>Créez un compte gratuit en cliquant sur <strong>"Sign up"</strong></li>
+                  <li>Dans le menu à gauche, cliquez sur <strong>"API Keys"</strong></li>
+                  <li>Cliquez sur <strong>"Create Key"</strong>, nommez-la <strong>Bipbip</strong>, puis copiez-la</li>
+                </ol>
+                <p style={{ margin:"14px 0 0", color:"#444", fontSize:16 }}>
+                  💡 Anthropic offre des crédits gratuits pour commencer.{" "}
+                  <a href="https://www.anthropic.com/pricing" target="_blank" rel="noreferrer" style={s.link}>Voir les tarifs →</a>
+                </p>
+              </div>
+              <div style={s.formRow}>
+                <label htmlFor="api-key-input" style={s.label}>Collez votre clé API ici :</label>
+                <input id="api-key-input" type="password" value={key} onChange={e => setKey(e.target.value)}
+                  style={s.input} placeholder="sk-ant-api03-..." aria-describedby="ak-hint ak-error" autoComplete="off" />
+                <p id="ak-hint" style={s.hint}>Votre clé est stockée uniquement sur votre appareil, jamais envoyée ailleurs.</p>
+                {error && <p id="ak-error" role="alert" style={s.errorMsg}>{error}</p>}
+              </div>
+              <button style={key.trim() ? s.btnPrimary : s.btnDisabled} onClick={validate}
+                disabled={!key.trim() || testing} aria-busy={testing}>
+                {testing ? "Vérification en cours..." : "Valider ma clé et commencer"}
+              </button>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    function HomeView({ setView, profiles, activeIdx, setActiveIdx, liveMsg, onChangeKey }) {
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Bipbip" subtitle="Votre secrétaire numérique pour formulaires PDF" />
+          <main style={s.main}>
+            <nav aria-label="Actions principales" style={s.homeNav}>
+              {[
+                { icon:"📄", label:"Remplir un formulaire", view:"form" },
+                { icon:"👤", label:"Mon profil",            view:"profile" },
+                { icon:"📁", label:"Historique",            view:"history" },
+              ].map(btn => (
+                <button key={btn.view} style={s.homeBtn} onClick={() => setView(btn.view)}>
+                  <span aria-hidden="true" style={s.homeBtnIcon}>{btn.icon}</span>{btn.label}
+                </button>
+              ))}
+            </nav>
+            {profiles.length > 1 && (
+              <section aria-labelledby="sw-lbl" style={s.section}>
+                <h2 id="sw-lbl" style={s.h2}>Profil actif</h2>
+                <label htmlFor="profile-sel" style={s.label}>Choisir un profil :</label>
+                <select id="profile-sel" value={activeIdx} onChange={e => setActiveIdx(Number(e.target.value))} style={s.input}>
+                  {profiles.map((p, i) => <option key={p.id} value={i}>{p.firstName} {p.lastName}</option>)}
+                </select>
+              </section>
+            )}
+            <section style={{ ...s.section, borderBottom:"none" }}>
+              <button style={s.btnSecondary} onClick={onChangeKey}>🔑 Changer ma clé API</button>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    function ProfileView({ profiles, activeIdx, updateProfiles, setView, liveMsg, announce }) {
+      const [editIdx, setEditIdx] = useState(activeIdx);
+      const [form, setForm]       = useState(() => profiles[activeIdx] ? { ...profiles[activeIdx] } : { id: Date.now() });
+      const isNew = editIdx >= profiles.length;
+
+      const loadProfile = (idx) => { setEditIdx(idx); setForm({ ...profiles[idx] }); };
+      const startNew    = ()    => { setEditIdx(profiles.length); setForm({ id: Date.now() }); };
+      const set         = (k,v) => setForm(f => ({ ...f, [k]: v }));
+
+      const save = () => {
+        const updated = [...profiles];
+        if (isNew) updated.push(form); else updated[editIdx] = form;
+        updateProfiles(updated, isNew ? updated.length - 1 : editIdx);
+        if (isNew) setEditIdx(updated.length - 1);
+        announce("Profil sauvegardé.");
+      };
+
+      const handleSig = (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => { set("signature", ev.target.result); set("sigName", file.name); announce("Signature chargée."); };
+        reader.readAsDataURL(file);
+      };
+
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Mon profil" back={{ label:"← Accueil", action:() => setView("home") }} />
+          <main style={s.main}>
+            {profiles.length > 0 && (
+              <section aria-labelledby="sel-lbl" style={s.section}>
+                <h2 id="sel-lbl" style={s.h2}>Profils enregistrés</h2>
+                <div style={{ display:"flex", gap:8, flexWrap:"wrap" }}>
+                  {profiles.map((p,i) => (
+                    <button key={p.id} style={editIdx===i&&!isNew ? s.btnPrimary : s.btnSecondary} onClick={() => loadProfile(i)}>
+                      {p.firstName||"Sans nom"} {p.lastName}
+                    </button>
+                  ))}
+                  <button style={s.btnSecondary} onClick={startNew}>+ Nouveau profil</button>
+                </div>
+              </section>
+            )}
+            <section aria-labelledby="ed-lbl" style={s.section}>
+              <h2 id="ed-lbl" style={s.h2}>{isNew ? "Nouveau profil" : "Modifier le profil"}</h2>
+              {PROFILE_FIELDS.map(f => (
+                <div key={f.key} style={s.formRow}>
+                  <label htmlFor={`pf-${f.key}`} style={s.label}>{f.label}</label>
+                  <input id={`pf-${f.key}`} type="text" value={form[f.key]||""} onChange={e => set(f.key, e.target.value)} style={s.input} />
+                </div>
+              ))}
+              <div style={s.formRow}>
+                <label htmlFor="sig-up" style={s.label}>Signature (image PNG ou JPG)</label>
+                <label htmlFor="sig-up" style={s.fileLabel}>
+                  Choisir ma signature
+                  <input id="sig-up" type="file" accept="image/*" onChange={handleSig} style={s.fileInput} />
+                </label>
+                {form.sigName && <p style={s.success}>✓ {form.sigName}</p>}
+                {form.signature && <img src={form.signature} alt="Aperçu de votre signature" style={{ maxHeight:60, marginTop:8, border:"1px solid #ccc", display:"block" }} />}
+              </div>
+              <button style={s.btnPrimary} onClick={save}>Enregistrer le profil</button>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    function FormView({ activeProfile, activeIdx, apiKey, setView, updateProfileAtIdx, addHistory, liveMsg, announce }) {
+      const [pdfFile,    setPdfFile]    = useState(null);
+      const [pdfText,    setPdfText]    = useState("");
+      const [processing, setProcessing] = useState(false);
+      const [filledData, setFilledData] = useState(null);
+      const [questions,  setQuestions]  = useState([]);
+      const [answers,    setAnswers]    = useState({});
+      const [correction, setCorrection] = useState("");
+      const [status,     setStatus]     = useState("");
+
+      const extractPdfText = async (file) => {
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = async (e) => {
+            try {
+              if (!window.pdfjsLib) {
+                await new Promise((res, rej) => {
+                  const sc = document.createElement("script");
+                  sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+                  sc.onload = res; sc.onerror = rej; document.head.appendChild(sc);
+                });
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+                  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+              }
+              const pdf = await window.pdfjsLib.getDocument({ data: e.target.result }).promise;
+              let text = "";
+              for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                text += content.items.map(it => it.str).join(" ") + "\n";
+              }
+              resolve(text.trim() || "PDF sans texte extractible.");
+            } catch { resolve("Erreur lecture PDF."); }
+          };
+          reader.readAsArrayBuffer(file);
+        });
+      };
+
+      const handlePdfUpload = async (e) => {
+        const file = e.target.files[0]; if (!file) return;
+        setPdfFile(file); setFilledData(null); setQuestions([]); setAnswers({});
+        setStatus("Lecture du PDF..."); announce("Lecture du PDF en cours.");
+        const text = await extractPdfText(file);
+        setPdfText(text);
+        setStatus("PDF chargé. Cliquez sur Au boulot !"); announce("PDF chargé. Prêt à analyser.");
+      };
+
+      const callClaude = async (prompt) => {
+        const res = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: { "Content-Type":"application/json", "x-api-key": apiKey, "anthropic-version":"2023-06-01" },
+          body: JSON.stringify({ model:"claude-sonnet-4-20250514", max_tokens:1500, messages:[{ role:"user", content:prompt }] })
+        });
+        const data = await res.json();
+        return data.content?.map(b => b.text||"").join("") || "";
+      };
+
+      const analyze = async (correctionNote="") => {
+        if (!pdfText || !activeProfile) return;
+        setProcessing(true); setStatus("Bipbip est au boulot..."); announce("Analyse en cours, veuillez patienter.");
+        const profileStr = PROFILE_FIELDS.map(f => `${f.label}: ${activeProfile[f.key]||"(non renseigné)"}`).join("\n");
+        const prompt = `Tu es une secrétaire aidant une personne non-voyante à remplir un formulaire administratif.
+
+PROFIL :
+${profileStr}
+
+FORMULAIRE PDF (texte extrait) :
+${pdfText}
+${correctionNote ? `\nCORRECTIONS : ${correctionNote}` : ""}
+
+Détecte la langue du formulaire (français, anglais, espagnol, roumain ou autre) et pose toutes tes questions à l'utilisateur dans cette même langue. Place la signature et son équivalent selon la langue : "Lu et approuvé" (français), "Read and approved" (anglais), "Leído y aprobado" (espagnol), "Citit și aprobat" (roumain).
+
+Réponds UNIQUEMENT en JSON valide, sans balises markdown, avec cette structure exacte :
+{
+  "filled": [{"field": "nom du champ", "value": "valeur", "source": "profil"}],
+  "questions": [{"id": "q1", "field": "nom du champ", "question": "question à l'utilisateur", "type": "text", "options": []}],
+  "needsSignature": true,
+  "needsLuApprouve": true,
+  "summary": "résumé court du formulaire",
+  "language": "fr"
+}
+Règles :
+- "radio" uniquement pour choix multiples, avec "options" rempli
+- "text" pour champs libres, avec "options" vide []
+- Ne devine jamais les cases à cocher, pose toujours la question
+- Le champ "options" doit toujours être présent, mettre [] si vide`;
+
+        try {
+          const raw   = await callClaude(prompt);
+          const clean = raw.replace(/```json|```/g,"").trim();
+          const parsed = JSON.parse(clean);
+          setFilledData(parsed); setQuestions(parsed.questions||[]); setAnswers({});
+          const msg = `Terminé ! ${parsed.filled?.length||0} champs remplis. ${parsed.questions?.length||0} question(s) à compléter.`;
+          setStatus(msg); announce(msg);
+        } catch { setStatus("Erreur d'analyse. Réessayez."); announce("Erreur lors de l'analyse."); }
+        setProcessing(false);
+      };
+
+      const allAnswered = questions.every(q => (answers[q.id]||"").trim() !== "");
+
+      const finalize = async () => {
+        const allFields = [
+          ...(filledData.filled||[]),
+          ...questions.map(q => ({ field:q.field, value:answers[q.id]||"", source:"utilisateur" }))
+        ];
+        const updated = { ...activeProfile };
+        questions.forEach(q => {
+          const match = PROFILE_FIELDS.find(f => f.label.toLowerCase() === q.field.toLowerCase());
+          if (match && answers[q.id]) updated[match.key] = answers[q.id];
+        });
+        updateProfileAtIdx(activeIdx, updated);
+        const entry = {
+          id: Date.now(), date: new Date().toLocaleDateString("fr-FR"),
+          fileName: pdfFile?.name||"formulaire.pdf", summary: filledData.summary||"",
+          fields: allFields, needsSignature: filledData.needsSignature,
+          needsLuApprouve: filledData.needsLuApprouve, language: filledData.language||"fr",
+          signature: activeProfile.signature||null,
+        };
+        addHistory(entry);
+        announce("Formulaire finalisé. Génération du PDF...");
+        await generatePdf(entry);
+      };
+
+      const generatePdf = async (entry) => {
+        if (!window.PDFLib) {
+          await new Promise((res, rej) => {
+            const sc = document.createElement("script");
+            sc.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js";
+            sc.onload = res; sc.onerror = rej; document.head.appendChild(sc);
+          });
+        }
+        const { PDFDocument, rgb, StandardFonts } = window.PDFLib;
+        const pdfDoc  = await PDFDocument.create();
+        const font     = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+        let page = pdfDoc.addPage([595,842]);
+        const { height } = page.getSize();
+        let y = height - 50;
+        const lm = 50, lineH = 22;
+
+        const checkPage = () => { if (y < 80) { page = pdfDoc.addPage([595,842]); y = height-50; } };
+        const addText = (text,x,yPos,size,f,color) => {
+          page.drawText(String(text).substring(0,90), { x, y:yPos, size, font:f, color:color||rgb(0,0,0) });
+        };
+
+        addText("Bipbip – Formulaire complété", lm, y, 18, fontBold, rgb(0,0.2,0.4)); y-=30;
+        addText(`Fichier : ${entry.fileName}`, lm, y, 11, font, rgb(0.3,0.3,0.3)); y-=18;
+        addText(`Date : ${entry.date}`, lm, y, 11, font, rgb(0.3,0.3,0.3)); y-=18;
+        addText(`Résumé : ${entry.summary}`, lm, y, 11, font, rgb(0.3,0.3,0.3)); y-=30;
+        addText("Champs remplis :", lm, y, 13, fontBold); y-=22;
+        page.drawLine({ start:{x:lm,y}, end:{x:545,y}, thickness:1, color:rgb(0.7,0.7,0.7) }); y-=14;
+
+        for (const f of entry.fields) {
+          checkPage();
+          const label = String(f.field).substring(0,32).padEnd(33);
+          addText(`${label}: ${String(f.value).substring(0,50)}`, lm, y, 11, font); y-=lineH;
+        }
+        y-=20; checkPage();
+
+        const luApprouve = { fr:"Lu et approuvé", en:"Read and approved", es:"Leído y aprobado", ro:"Citit și aprobat" };
+        if (entry.needsLuApprouve) { addText(luApprouve[entry.language]||"Lu et approuvé", lm, y, 13, fontBold); y-=40; }
+
+        if (entry.needsSignature && entry.signature) {
+          try {
+            checkPage();
+            addText("Signature :", lm, y, 13, fontBold); y-=10;
+            const sigData = entry.signature.split(",")[1];
+            const mime    = (entry.signature.match(/data:(image\/\w+);/)||[])[1]||"image/png";
+            const bytes   = Uint8Array.from(atob(sigData), c => c.charCodeAt(0));
+            const sigImage = mime.includes("jp") ? await pdfDoc.embedJpg(bytes) : await pdfDoc.embedPng(bytes);
+            const dims = sigImage.scale(0.3);
+            checkPage();
+            page.drawImage(sigImage, { x:lm, y:y-dims.height, width:dims.width, height:dims.height });
+            y -= dims.height+20;
+          } catch { addText("[Signature non intégrée]", lm, y, 11, font, rgb(0.6,0,0)); y-=20; }
+        }
+
+        const pdfBytes = await pdfDoc.save();
+        const blob = new Blob([pdfBytes], { type:"application/pdf" });
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement("a");
+        a.href = url; a.download = `bipbip_${entry.fileName}`; a.click();
+        URL.revokeObjectURL(url);
+        setStatus("✅ PDF généré et téléchargé avec succès !");
+        announce("Le formulaire PDF complété a été téléchargé sur votre appareil.");
+      };
+
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Bipbip" back={{ label:"← Accueil", action:() => setView("home") }}
+            navExtra={[{ label:"Mon profil", action:() => setView("profile") },{ label:"Historique", action:() => setView("history") }]} />
+          <main style={s.main}>
+            {!activeProfile ? (
+              <div role="alert" style={s.alertWarn}>
+                <p>Aucun profil créé. <button style={s.linkBtn} onClick={() => setView("profile")}>Créer mon profil</button></p>
+              </div>
+            ) : (
+              <>
+                <section aria-labelledby="up-lbl" style={s.section}>
+                  <h2 id="up-lbl" style={s.h2}>1. Charger un formulaire PDF</h2>
+                  <p style={s.hint}>Profil actif : <strong>{activeProfile.firstName} {activeProfile.lastName}</strong></p>
+                  <label htmlFor="pdf-in" style={s.fileLabel}>
+                    Choisir un fichier PDF
+                    <input id="pdf-in" type="file" accept=".pdf" onChange={handlePdfUpload} style={s.fileInput} />
+                  </label>
+                  {pdfFile && <p style={s.success} role="status">✓ {pdfFile.name} chargé</p>}
+                </section>
+
+                {pdfFile && !filledData && (
+                  <section aria-labelledby="an-lbl" style={s.section}>
+                    <h2 id="an-lbl" style={s.h2}>2. Remplir le document</h2>
+                    <button style={s.btnPrimary} onClick={() => analyze()} disabled={processing} aria-busy={processing}>
+                      {processing ? "Au boulot..." : "Remplir le document"}
+                    </button>
+                    {status && <p role="status" style={s.statusMsg}>{status}</p>}
+                  </section>
+                )}
+
+                {filledData && (
+                  <>
+                    <section aria-labelledby="fi-lbl" style={s.section}>
+                      <h2 id="fi-lbl" style={s.h2}>Champs remplis automatiquement</h2>
+                      <p style={s.hint}>{filledData.summary}</p>
+                      <p style={s.badge} role="status">
+                        ✓ {filledData.filled?.length||0} champs &nbsp;|&nbsp;
+                        ❓ {questions.length} question(s) &nbsp;|&nbsp;
+                        {filledData.needsSignature ? "✎ Signature" : "Pas de signature"} &nbsp;|&nbsp;
+                        {filledData.needsLuApprouve ? "📋 Lu et approuvé" : ""}
+                      </p>
+                      <ul style={s.fieldList} aria-label="Champs remplis automatiquement">
+                        {(filledData.filled||[]).map((f,i) => (
+                          <li key={i} style={s.fieldItem}>
+                            <span style={s.fieldName}>{f.field} :</span><span>{f.value}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+
+                    {questions.length > 0 && (
+                      <section aria-labelledby="q-lbl" style={s.section}>
+                        <h2 id="q-lbl" style={s.h2}>Questions complémentaires</h2>
+                        <p style={s.hint}>Répondez à chaque question pour compléter le formulaire.</p>
+                        {questions.map(q => (
+                          <fieldset key={q.id} style={s.fieldset}>
+                            <legend style={s.legend}>{q.question}</legend>
+                            {q.type==="radio" && q.options?.length ? (
+                              q.options.map((opt,oi) => (
+                                <label key={oi} style={s.radioLabel}>
+                                  <input type="radio" name={q.id} value={opt}
+                                    checked={answers[q.id]===opt}
+                                    onChange={() => setAnswers(a => ({ ...a, [q.id]:opt }))} style={s.radio} />
+                                  {opt}
+                                </label>
+                              ))
+                            ) : (
+                              <input type="text" value={answers[q.id]||""}
+                                onChange={e => setAnswers(a => ({ ...a, [q.id]:e.target.value }))}
+                                style={s.input} aria-required="true" />
+                            )}
+                          </fieldset>
+                        ))}
+                      </section>
+                    )}
+
+                    <section aria-labelledby="cor-lbl" style={s.section}>
+                      <h2 id="cor-lbl" style={s.h2}>Signaler une erreur à Bipbip</h2>
+                      <label htmlFor="cor-in" style={s.label}>Décrivez la correction :</label>
+                      <textarea id="cor-in" value={correction} onChange={e => setCorrection(e.target.value)}
+                        rows={3} style={s.textarea}
+                        placeholder="Ex : Mon prénom est mal orthographié, il faut écrire Marie-Claire" />
+                      <button style={s.btnSecondary} onClick={() => { analyze(correction); setCorrection(""); }}
+                        disabled={processing||!correction.trim()}>
+                        Envoyer la correction
+                      </button>
+                    </section>
+
+                    <section aria-labelledby="val-lbl" style={s.section}>
+                      <h2 id="val-lbl" style={s.h2}>Valider et télécharger le PDF</h2>
+                      {!allAnswered && questions.length > 0 && (
+                        <p role="alert" style={s.alertWarn}>Veuillez répondre à toutes les questions avant de valider.</p>
+                      )}
+                      <button style={allAnswered ? s.btnPrimary : s.btnDisabled} onClick={finalize}
+                        disabled={!allAnswered} aria-disabled={!allAnswered}>
+                        Valider et télécharger le PDF complété
+                      </button>
+                      {status && <p role="status" style={s.statusMsg}>{status}</p>}
+                    </section>
+                  </>
+                )}
+              </>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    function HistoryView({ history, setView, openPreview, liveMsg }) {
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Historique" back={{ label:"← Accueil", action:() => setView("home") }} />
+          <main style={s.main}>
+            {history.length===0 ? (
+              <p style={s.hint}>Aucun formulaire complété pour l'instant.</p>
+            ) : (
+              <ul style={s.fieldList} aria-label="Formulaires complétés">
+                {history.map(h => (
+                  <li key={h.id} style={{ ...s.fieldItem, flexDirection:"column", alignItems:"flex-start", gap:6 }}>
+                    <strong>{h.fileName}</strong>
+                    <span style={s.hint}>{h.date} — {h.summary}</span>
+                    <span style={s.badge}>{h.fields?.length||0} champs remplis</span>
+                    <button style={s.btnSecondary} onClick={() => openPreview(h)}>Voir le détail</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </main>
+        </div>
+      );
+    }
+
+    function PreviewView({ entry, setView, liveMsg }) {
+      if (!entry) return (
+        <div style={s.container}>
+          <Header title="Prévisualisation" back={{ label:"← Accueil", action:() => setView("home") }} />
+          <main style={s.main}><p>Aucune donnée à afficher.</p></main>
+        </div>
+      );
+      return (
+        <div style={s.container}>
+          <LiveRegion msg={liveMsg} />
+          <Header title="Prévisualisation" back={{ label:"← Accueil", action:() => setView("home") }}
+            navExtra={[{ label:"Historique", action:() => setView("history") }]} />
+          <main style={s.main}>
+            <section aria-labelledby="pv-lbl" style={s.section}>
+              <h2 id="pv-lbl" style={s.h2}>{entry.fileName}</h2>
+              <p style={s.hint}>{entry.date} — {entry.summary}</p>
+              <p style={s.badge} role="status">
+                {entry.fields?.length||0} champs &nbsp;|&nbsp;
+                {entry.needsSignature ? "Signature placée" : "Pas de signature"} &nbsp;|&nbsp;
+                {entry.needsLuApprouve ? "Lu et approuvé ajouté" : ""}
+              </p>
+              <table style={s.table} aria-label="Contenu du formulaire rempli">
+                <caption style={s.srOnly}>Tous les champs remplis dans ce formulaire</caption>
+                <thead>
+                  <tr>
+                    <th style={s.th} scope="col">Champ</th>
+                    <th style={s.th} scope="col">Valeur</th>
+                    <th style={s.th} scope="col">Source</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {(entry.fields||[]).map((f,i) => (
+                    <tr key={i} style={i%2===0 ? s.trEven : {}}>
+                      <td style={s.td}>{f.field}</td>
+                      <td style={s.td}>{f.value}</td>
+                      <td style={s.td}>{f.source}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    function LiveRegion({ msg }) {
+      return <div aria-live="polite" aria-atomic="true" style={s.srOnly}>{msg}</div>;
+    }
+
+    function Header({ title, subtitle, back, navExtra }) {
+      return (
+        <header style={s.header}>
+          <div>
+            <h1 style={s.h1}>{title}</h1>
+            {subtitle && <p style={s.subtitle}>{subtitle}</p>}
+          </div>
+          <nav style={s.nav} aria-label="Navigation">
+            {back && <button style={s.navBtn} onClick={back.action}>{back.label}</button>}
+            {navExtra?.map(n => <button key={n.label} style={s.navBtn} onClick={n.action}>{n.label}</button>)}
+          </nav>
+        </header>
+      );
+    }
+
+    const s = {
+      container:   { fontFamily:"Arial, sans-serif", fontSize:"18px", lineHeight:1.6, color:"#1a1a1a", background:"#fff", minHeight:"100vh" },
+      header:      { background:"#003366", color:"#fff", padding:"16px 24px", display:"flex", flexWrap:"wrap", alignItems:"center", gap:16 },
+      h1:          { margin:0, fontSize:"24px", color:"#fff" },
+      subtitle:    { margin:"4px 0 0", fontSize:"15px", color:"#cce0ff" },
+      nav:         { marginLeft:"auto", display:"flex", gap:8, flexWrap:"wrap" },
+      navBtn:      { background:"transparent", border:"2px solid #fff", color:"#fff", padding:"6px 14px", borderRadius:4, cursor:"pointer", fontSize:"16px" },
+      main:        { padding:"24px", maxWidth:800, margin:"0 auto" },
+      section:     { marginBottom:32, borderBottom:"1px solid #ddd", paddingBottom:24 },
+      h2:          { fontSize:"20px", color:"#003366", marginBottom:12 },
+      hint:        { color:"#555", fontSize:"16px", margin:"4px 0 12px" },
+      label:       { display:"block", fontWeight:"bold", marginBottom:6 },
+      input:       { width:"100%", padding:"10px", fontSize:"16px", border:"2px solid #666", borderRadius:4, boxSizing:"border-box" },
+      textarea:    { width:"100%", padding:"10px", fontSize:"16px", border:"2px solid #666", borderRadius:4, boxSizing:"border-box", fontFamily:"inherit" },
+      fileLabel:   { display:"inline-block", padding:"10px 18px", background:"#f0f4f8", border:"2px solid #666", borderRadius:4, cursor:"pointer", fontSize:"16px" },
+      fileInput:   { position:"absolute", width:1, height:1, overflow:"hidden", clip:"rect(0,0,0,0)" },
+      btnPrimary:  { background:"#003366", color:"#fff", border:"none", padding:"12px 24px", fontSize:"18px", borderRadius:4, cursor:"pointer", marginTop:8 },
+      btnSecondary:{ background:"#fff", color:"#003366", border:"2px solid #003366", padding:"10px 20px", fontSize:"16px", borderRadius:4, cursor:"pointer", marginTop:8 },
+      btnDisabled: { background:"#aaa", color:"#fff", border:"none", padding:"12px 24px", fontSize:"18px", borderRadius:4, cursor:"not-allowed", marginTop:8 },
+      linkBtn:     { background:"none", border:"none", color:"#003366", textDecoration:"underline", cursor:"pointer", fontSize:"inherit" },
+      success:     { color:"#006600", fontWeight:"bold", margin:"8px 0" },
+      errorMsg:    { color:"#cc0000", fontWeight:"bold", margin:"8px 0", padding:"10px", background:"#fff0f0", border:"2px solid #cc0000", borderRadius:4 },
+      alertWarn:   { background:"#fff3cd", border:"2px solid #856404", padding:"12px", borderRadius:4, color:"#856404", margin:"8px 0" },
+      statusMsg:   { background:"#e8f4fd", border:"1px solid #bee5eb", padding:"10px", borderRadius:4, marginTop:8 },
+      badge:       { display:"inline-block", background:"#e8f0fe", color:"#003366", padding:"4px 12px", borderRadius:20, fontSize:"15px", marginBottom:12 },
+      fieldList:   { listStyle:"none", padding:0, margin:0 },
+      fieldItem:   { display:"flex", gap:8, padding:"10px 0", borderBottom:"1px solid #eee", alignItems:"center" },
+      fieldName:   { fontWeight:"bold", minWidth:180 },
+      fieldset:    { border:"2px solid #666", borderRadius:4, padding:"12px 16px", marginBottom:16 },
+      legend:      { fontWeight:"bold", fontSize:"17px", padding:"0 8px" },
+      radioLabel:  { display:"block", padding:"6px 0", cursor:"pointer" },
+      radio:       { marginRight:10, width:20, height:20 },
+      formRow:     { marginBottom:16 },
+      homeNav:     { display:"flex", flexDirection:"column", gap:16, maxWidth:400, margin:"32px auto" },
+      homeBtn:     { display:"flex", alignItems:"center", gap:16, padding:"20px 24px", fontSize:"20px", background:"#003366", color:"#fff", border:"none", borderRadius:8, cursor:"pointer", width:"100%" },
+      homeBtnIcon: { fontSize:"28px" },
+      infoBox:     { background:"#f0f7ff", border:"2px solid #003366", borderRadius:8, padding:"20px", marginBottom:24 },
+      link:        { color:"#003366", fontWeight:"bold" },
+      table:       { width:"100%", borderCollapse:"collapse", marginTop:16 },
+      th:          { background:"#003366", color:"#fff", padding:"10px 12px", textAlign:"left", fontSize:"16px" },
+      td:          { padding:"10px 12px", borderBottom:"1px solid #ddd", fontSize:"16px" },
+      trEven:      { background:"#f7f9fc" },
+      srOnly:      { position:"absolute", width:1, height:1, padding:0, margin:-1, overflow:"hidden", clip:"rect(0,0,0,0)", whiteSpace:"nowrap", border:0 },
+    };
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
